@@ -2,14 +2,14 @@
   "appId": "com.example.daoshuri",
   "appName": "时光屿月",
   "webDir": "www",
-  "backgroundColor": "#ff5e62",
+  "backgroundColor": "#0d0e12",
   "ios": { "contentInset": "never" },
   "server": { "androidScheme": "https" },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0,
       "launchAutoHide": true,
-      "backgroundColor": "#ff5e62"
+      "backgroundColor": "#0d0e12"
     }
   }
 }
