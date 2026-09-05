@@ -1000,7 +1000,7 @@ body.lock { overflow: hidden; }
 /* 通用交互反馈：键盘焦点、按压、选区 */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 ::selection { background: var(--accent-soft); color: var(--accent); }
-button { -webkit-tap-highlight-color: rgba(255, 94, 98, .16); }
+button { -webkit-tap-highlight-color: transparent; }
 .btn, .save-btn, .cat-ok, .cm-eok { letter-spacing: .5px; }
 /* 桌面悬停统一手感 */
 @media (hover: hover) and (min-width: 700px) {
