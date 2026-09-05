@@ -799,10 +799,13 @@
       '<p class="cat-hint">点「✎」改名（行内编辑），点「🗑」立即删除（该分类下的事件会自动归入其它分类，可撤销）。</p>' +
       '<div class="ed-group" id="cmList"></div>' +
       '<div class="cat-new">' +
+      '<div class="cn-head">' +
+      '<div class="cn-preview" id="cmPreview">⭐</div>' +
       '<input id="cmName" maxlength="8" placeholder="新分类名称，如：健身"/>' +
-      '<input class="icn" id="cmIco" maxlength="2" placeholder="图标"/>' +
+      '<input class="icn" id="cmIco" maxlength="2" placeholder="图"/>' +
+      '</div>' +
       '<div class="cols" id="cmCols"></div>' +
-      '<button class="cat-ok" id="cmOk" type="button">添加</button>' +
+      '<button class="cat-ok" id="cmOk" type="button">添加分类</button>' +
       '</div>' +
       '</div>'
     );
@@ -843,12 +846,18 @@
 
     // 添加新分类
     const colsEl = sheetEl.querySelector('#cmCols');
+    const preview = sheetEl.querySelector('#cmPreview');
     PALETTE.forEach((p) => { const b = document.createElement('button'); b.type = 'button'; b.style.background = p; b.dataset.c = p; colsEl.appendChild(b); });
     colsEl.querySelector('button').classList.add('on');
+    preview.style.setProperty('--cc', PALETTE[0]);
     colsEl.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
       colsEl.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
+      preview.style.setProperty('--cc', b.dataset.c);
+    });
+    sheetEl.querySelector('#cmIco').addEventListener('input', (e) => {
+      preview.textContent = e.target.value.trim() || '⭐';
     });
     sheetEl.querySelector('#cmOk').onclick = () => {
       const nm = sheetEl.querySelector('#cmName').value.trim();
@@ -857,6 +866,9 @@
       const ic = sheetEl.querySelector('#cmIco').value.trim() || '⭐';
       S().addCat({ id: 'c' + Date.now().toString(36), name: nm, color: col, icon: ic });
       sheetEl.querySelector('#cmName').value = ''; sheetEl.querySelector('#cmIco').value = '';
+      preview.textContent = '⭐'; preview.style.setProperty('--cc', PALETTE[0]);
+      colsEl.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+      colsEl.querySelector('button').classList.add('on');
       paint(); renderChips(); toast('已添加分类');
     };
 
