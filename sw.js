@@ -1,7 +1,7 @@
 /* PWA: offline cache + local reminder scheduler */
 'use strict';
 
-const VERSION = 'daoshuri-v2.54.0';
+const VERSION = 'daoshuri-v2.55.0';
 const SHELL = [
   './',
   './index.html',
@@ -71,17 +71,26 @@ function fireOne(item) {
   } catch (err) { /* 静默 */ }
 }
 
+let firedKeys = new Set();
 function scheduleFromCache() {
   clearTimer();
   readSchedule().then((list) => {
     const now = Date.now();
     const future = list.filter((i) => i.dueAt && i.dueAt > now).sort((a, b) => a.dueAt - b.dueAt);
     const due = list.filter((i) => i.dueAt && i.dueAt <= now);
-    due.forEach(fireOne);
+    due.forEach((i) => {
+      const key = i.id + ':' + i.dueAt;
+      if (!firedKeys.has(key)) { firedKeys.add(key); fireOne(i); }
+    });
     if (!future.length) return;
     // SW may be killed at any time; reminders are best-effort while running (pre-warm up to 3 min).
+    const next = future[0];
     const wait = Math.min(next.dueAt - now, 3 * 86400000);
-    timer = setTimeout(() => { fireOne(next); scheduleFromCache(); }, wait);
+    timer = setTimeout(() => {
+      const key = next.id + ':' + next.dueAt;
+      if (!firedKeys.has(key)) { firedKeys.add(key); fireOne(next); }
+      scheduleFromCache();
+    }, wait);
   }).catch(() => {});
 }
 
