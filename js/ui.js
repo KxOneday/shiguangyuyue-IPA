@@ -802,7 +802,7 @@
       '<div class="cn-head">' +
       '<div class="cn-preview" id="cmPreview">⭐</div>' +
       '<input id="cmName" maxlength="8" placeholder="新分类名称，如：健身"/>' +
-      '<input class="icn" id="cmIco" maxlength="2" placeholder="图"/>' +
+      '<input class="icn" id="cmIco" maxlength="2" placeholder="图标"/>' +
       '</div>' +
       '<div class="cols" id="cmCols"></div>' +
       '<button class="cat-ok" id="cmOk" type="button">添加分类</button>' +
