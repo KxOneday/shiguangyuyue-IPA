@@ -22,18 +22,10 @@
       position: fixed; inset: 0; z-index: 99999;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       background:
-        radial-gradient(1200px 500px at 50% -8%, rgba(255,164,92,.18), transparent 60%),
-        radial-gradient(900px 420px at 108% 8%, rgba(255,77,109,.12), transparent 55%),
-        #f3f4f8;
+        radial-gradient(1200px 500px at 50% -8%, rgba(255,138,92,.12), transparent 60%),
+        radial-gradient(900px 420px at 108% 8%, rgba(255,94,98,.10), transparent 55%),
+        #0d0e12;
       transition: opacity .38s ease, transform .38s ease;
-    }
-    @media (prefers-color-scheme: dark) {
-      #splash {
-        background:
-          radial-gradient(1200px 500px at 50% -8%, rgba(255,138,92,.06), transparent 60%),
-          radial-gradient(900px 420px at 108% 8%, rgba(255,94,98,.05), transparent 55%),
-          #0d0e12;
-      }
     }
     #splash.hide { opacity: 0; transform: scale(1.04); pointer-events: none; }
     .splash-logo {
@@ -56,20 +48,17 @@
     .splash-logo > svg { position: relative; z-index: 1; width: 44px; height: 44px; color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.15)); }
     .splash-name {
       margin-top: 24px; font-size: 27px; font-weight: 600; letter-spacing: 6px;
-      color: #181a20; animation: spIn .55s .08s cubic-bezier(.2,.8,.2,1) both;
+      color: #eef0f5; animation: spIn .55s .08s cubic-bezier(.2,.8,.2,1) both;
     }
-    @media (prefers-color-scheme: dark) { .splash-name { color: #eef0f5; } }
     .splash-sub {
-      margin-top: 10px; font-size: 12.5px; color: #868b99; letter-spacing: 2px;
+      margin-top: 10px; font-size: 12.5px; color: #9aa1b0; letter-spacing: 2px;
       animation: spIn .55s .16s cubic-bezier(.2,.8,.2,1) both;
     }
-    @media (prefers-color-scheme: dark) { .splash-sub { color: #6b7280; } }
     .splash-bar {
       margin-top: 28px; width: 120px; height: 3px; border-radius: 3px;
-      background: rgba(24,26,32,.08); overflow: hidden;
+      background: rgba(255,255,255,.1); overflow: hidden;
       animation: spIn .55s .24s cubic-bezier(.2,.8,.2,1) both;
     }
-    @media (prefers-color-scheme: dark) { .splash-bar { background: rgba(255,255,255,.1); } }
     .splash-bar > i {
       display: block; height: 100%; width: 40%; border-radius: 3px;
       background: linear-gradient(90deg, #ff9a62, #ff4d6d);
