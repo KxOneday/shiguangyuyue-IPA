@@ -1,0 +1,59 @@
+# 一键打包 iOS 免签名 IPA（GitHub Actions · macOS Runner）
+# 用法：Actions → build-ipa → Run workflow → 完成后下载 shiguangyuyue-ipa 工件
+name: build-ipa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+
+      - name: 组装 www 网页资源
+        run: |
+          mkdir -p www
+          cp -r index.html manifest.webmanifest sw.js css js icons www/
+
+      - name: 确认 CocoaPods 可用
+        run: which pod || sudo gem install cocoapods --no-document
+
+      - name: 生成并同步 Capacitor iOS 工程（时光屿月）
+        run: |
+          rm -rf ios
+          npx cap add ios || true
+          npx cap sync ios
+          grep -n "CFBundleDisplayName" ios/App/App/Info.plist || true
+
+      - name: 无签名编译 Debug App（真机 SDK）
+        run: |
+          cd ios/App
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+
+      - name: 组装免签名 IPA（Payload 结构）
+        run: |
+          cd ios/App/build/Build/Products/Debug-iphoneos
+          rm -rf Payload shiguangyuyue-unsigned.ipa
+          mkdir -p Payload
+          cp -R App.app Payload/
+          zip -qry shiguangyuyue-unsigned.ipa Payload
+          ls -lh shiguangyuyue-unsigned.ipa
+
+      - name: 上传 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiguangyuyue-ipa
+          path: ios/App/build/Build/Products/Debug-iphoneos/shiguangyuyue-unsigned.ipa
+          if-no-files-found: error
