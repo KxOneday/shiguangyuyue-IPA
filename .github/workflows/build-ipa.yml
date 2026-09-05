@@ -35,6 +35,12 @@ jobs:
           npx cap sync ios
           grep -n "CFBundleDisplayName" ios/App/App/Info.plist || true
 
+      - name: 用指定图片替换 iOS 应用图标（全套 AppIcon 尺寸）
+        run: |
+          APPICON="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          ls "$APPICON"
+          node tools/apply-ios-icon.mjs "$APPICON" "icons/app-1024.png"
+
       - name: 无签名编译 Debug App（真机 SDK）
         run: |
           cd ios/App
