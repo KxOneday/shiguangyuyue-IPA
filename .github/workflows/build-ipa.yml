@@ -52,6 +52,16 @@ jobs:
           print('LaunchScreen backgroundColor -> #0d0e12')
           "
 
+      - name: 设置原生控件为中文（日期选择器/系统按钮跟随中文区域）
+        run: |
+          PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion zh_CN" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string zh_CN" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string zh_CN" "$PLIST"
+          echo "Info.plist CFBundleDevelopmentRegion -> zh_CN"
+
       - name: 无签名编译 Debug App（真机 SDK）
         run: |
           cd ios/App
