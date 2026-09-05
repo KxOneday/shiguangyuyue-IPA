@@ -1,5 +1,4 @@
-# 一键打包 iOS 免签名 IPA（GitHub Actions · macOS Runner）
-# 用法：Actions → build-ipa → Run workflow → 完成后下载 shiguangyuyue-ipa 工件
+# 涓€閿墦鍖?iOS 鍏嶇鍚?IPA锛圙itHub Actions 路 macOS Runner锛?# 鐢ㄦ硶锛欰ctions 鈫?build-ipa 鈫?Run workflow 鈫?瀹屾垚鍚庝笅杞?shiguangyuyue-ipa 宸ヤ欢
 name: build-ipa
 
 on:
@@ -9,47 +8,43 @@ jobs:
   ios:
     runs-on: macos-latest
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+      - name: 妫€鍑轰唬鐮?        uses: actions/checkout@v5
 
-      - name: 安装 Node
-        uses: actions/setup-node@v4
+      - name: 瀹夎 Node
+        uses: actions/setup-node@v5
         with:
           node-version: 20
 
-      - name: 安装依赖
+      - name: 瀹夎渚濊禆
         run: npm install --no-audit --no-fund
 
-      - name: 组装 www 网页资源
+      - name: 缁勮 www 缃戦〉璧勬簮
         run: |
           mkdir -p www
           cp -r index.html manifest.webmanifest sw.js css js icons www/
 
-      - name: 确认 CocoaPods 可用
+      - name: 纭 CocoaPods 鍙敤
         run: which pod || sudo gem install cocoapods --no-document
 
-      - name: 生成并同步 Capacitor iOS 工程（时光屿月）
+      - name: 鐢熸垚骞跺悓姝?Capacitor iOS 宸ョ▼锛堟椂鍏夊笨鏈堬級
         run: |
           rm -rf ios
           npx cap add ios || true
           npx cap sync ios
           grep -n "CFBundleDisplayName" ios/App/App/Info.plist || true
 
-      - name: 用指定图片替换 iOS 应用图标（全套 AppIcon 尺寸）
-        run: |
+      - name: 鐢ㄦ寚瀹氬浘鐗囨浛鎹?iOS 搴旂敤鍥炬爣锛堝叏濂?AppIcon 灏哄锛?        run: |
           APPICON="ios/App/App/Assets.xcassets/AppIcon.appiconset"
           ls "$APPICON"
           node tools/apply-ios-icon.mjs "$APPICON" "icons/app-1024.png"
 
-      - name: 无签名编译 Debug App（真机 SDK）
-        run: |
+      - name: 鏃犵鍚嶇紪璇?Debug App锛堢湡鏈?SDK锛?        run: |
           cd ios/App
           xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
             -sdk iphoneos -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
 
-      - name: 组装免签名 IPA（Payload 结构）
-        run: |
+      - name: 缁勮鍏嶇鍚?IPA锛圥ayload 缁撴瀯锛?        run: |
           cd ios/App/build/Build/Products/Debug-iphoneos
           rm -rf Payload shiguangyuyue-unsigned.ipa
           mkdir -p Payload
@@ -57,8 +52,8 @@ jobs:
           zip -qry shiguangyuyue-unsigned.ipa Payload
           ls -lh shiguangyuyue-unsigned.ipa
 
-      - name: 上传 IPA
-        uses: actions/upload-artifact@v4
+      - name: 涓婁紶 IPA
+        uses: actions/upload-artifact@v5
         with:
           name: shiguangyuyue-ipa
           path: ios/App/build/Build/Products/Debug-iphoneos/shiguangyuyue-unsigned.ipa
