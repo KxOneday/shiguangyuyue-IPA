@@ -4,5 +4,12 @@
   "webDir": "www",
   "backgroundColor": "#ff5e62",
   "ios": { "contentInset": "never" },
-  "server": { "androidScheme": "https" }
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#ff5e62"
+    }
+  }
 }
