@@ -51,7 +51,7 @@
 
   /* ---------- 状态 ---------- */
   const ui = {
-    filter: 'all', q: '', tab: 'list', view: 'list',
+    filter: 'all', q: '', tab: 'home', view: 'list',
     calYM: null, calSel: null, editingId: null,
     draftPhoto: null, // dataURL（新增/替换时）
     el: {}, lastDayStr: '', swipeLockUntil: 0
@@ -1563,14 +1563,13 @@
   }
 
   function setTab(tab) {
-    if (!['home', 'list', 'cal', 'set'].includes(tab)) tab = 'list';
-    const prev = ui.tab || 'list';
+    if (!['home', 'list', 'cal', 'set'].includes(tab)) tab = 'home';
+    const prev = ui.tab || 'home';
     if (prev === tab) { renderAll(); return; }
     ui.tab = tab;
     ui.q = ''; const sb = $('searchbar'), si = $('searchInput');
     if (sb) sb.hidden = true;
     if (si) si.value = '';
-    S().setPrefs({ tab });
     renderAll();
     animateTabSwitch(prev, tab);
   }
@@ -1906,8 +1905,7 @@
       const qt = new URLSearchParams(window.location.search || '').get('tab');
       if (['home', 'list', 'cal', 'set'].includes(qt)) ui.tab = qt;
     } catch (e) { /* 忽略 */ }
-    const pt = S().getPrefs().tab;
-    if (['home', 'list', 'cal', 'set'].includes(pt)) ui.tab = pt;
+    // 打开默认在首页（不再恢复上次所在的页签）
     // 若没有事件且是首次，不自动塞示例
     applyTheme();
     wireTop();
