@@ -41,6 +41,17 @@ jobs:
           ls "$APPICON"
           node tools/apply-ios-icon.mjs "$APPICON" "icons/app-1024.png"
 
+      - name: 启动屏背景改深色（消除粉红/白闪，与品牌启动动画一致）
+        run: |
+          python3 -c "
+          import re
+          p = 'ios/App/App/Base.lproj/LaunchScreen.storyboard'
+          with open(p, 'r', encoding='utf-8') as f: c = f.read()
+          c = re.sub(r'<color key=\"backgroundColor\"[^/]*/>', '<color key=\"backgroundColor\" red=\"0.050980392156862744\" green=\"0.054901960784313725\" blue=\"0.07058823529411765\" alpha=\"1\" colorSpace=\"custom\" customColorSpace=\"sRGB\"/>', c)
+          with open(p, 'w', encoding='utf-8') as f: f.write(c)
+          print('LaunchScreen backgroundColor -> #0d0e12')
+          "
+
       - name: 无签名编译 Debug App（真机 SDK）
         run: |
           cd ios/App
