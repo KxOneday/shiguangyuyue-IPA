@@ -839,7 +839,7 @@ body.lock { overflow: hidden; }
 }
 .cat-new input:focus { border-color: var(--accent); }
 #cmName { flex: 1; min-width: 0; }
-.cat-new .icn { width: 52px; text-align: center; flex: 0 0 52px; padding: 10px 4px; }
+.cat-new .icn { width: 44px; text-align: center; flex: 0 0 44px; padding: 10px 2px; min-width: 0; }
 .cat-new .cols {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; justify-items: center;
 }
