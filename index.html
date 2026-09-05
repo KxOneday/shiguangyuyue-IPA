@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="时光屿月" />
+  <meta name="theme-color" content="#ff5e62" />
+  <meta name="description" content="时光屿月：倒计时、纪念日、农历与生理周期记录" />
+  <title>时光屿月</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icons/app.png" />
+  <link rel="apple-touch-icon" href="icons/app.png" />
+  <link rel="stylesheet" href="css/app.css?v=254" />
+</head>
+<body>
+  <div id="app">
+    <!-- 顶栏 -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-name" id="brandName">纪念日</span><span class="brand-date" id="brandDate"></span>
+      </div>
+      <div class="top-actions">
+        <button id="btnSearch" class="iconbtn" type="button" title="搜索" aria-label="搜索"></button>
+        <button id="btnCat" class="iconbtn" type="button" title="分类管理" aria-label="分类管理"></button>
+        <button id="btnView" class="iconbtn" type="button" title="切换视图" aria-label="切换列表/日历"></button>
+        <button id="btnMore" class="iconbtn" type="button" title="更多" aria-label="更多"></button>
+        <button id="btnAdd" class="iconbtn add" type="button" title="新建事件" aria-label="新建事件"></button>
+      </div>
+    </header>
+
+    <!-- 搜索 -->
+    <div id="searchbar" class="searchbar" hidden>
+      <input id="searchInput" type="search" placeholder="搜索事件名称 / 备注" autocomplete="off" />
+      <button id="searchClear" type="button" class="iconbtn small" aria-label="关闭搜索"></button>
+    </div>
+
+    <!-- 纪念日页顶部面板：日期 + 分类（整体吸顶） -->
+    <div class="headpanel" id="headPanel">
+      <div class="todayline" id="todayline"></div>
+      <nav class="chips" id="chips" aria-label="筛选"></nav>
+    </div>
+
+    <!-- 主内容：各页面 -->
+    <main id="content" class="content"></main>
+  </div>
+
+  <!-- 底栏导航 -->
+  <nav id="tabbar" class="tabbar" aria-label="主导航">
+    <button type="button" class="tab" data-tab="home"><span class="tic"><svg data-ic="home" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></span><span class="tl">首页</span></button>
+    <button type="button" class="tab" data-tab="list"><span class="tic"><svg data-ic="list" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></span><span class="tl">纪念日</span></button>
+    <button type="button" class="tab" data-tab="cal"><span class="tic"><svg data-ic="cal" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></span><span class="tl">月历</span></button>
+    <button type="button" class="tab" data-tab="set"><span class="tic"><svg data-ic="set" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></svg></span><span class="tl">设置</span></button>
+  </nav>
+
+  <button id="fab" class="fab" type="button" aria-label="新建事件"></button>
+
+  <!-- 弹层（动作表 / 编辑器 / 确认框共用） -->
+  <div id="overlay" class="overlay" hidden>
+    <div class="overlay-mask" data-close="1"></div>
+    <div id="sheet" class="sheet" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- 隐藏文件选择 -->
+  <input id="photoFile" type="file" accept="image/*" hidden />
+  <input id="importFile" type="file" accept=".json,application/json" hidden />
+
+  <script src="js/lunar.js?v=254"></script>
+  <script src="js/core.js?v=254"></script>
+  <script src="js/store.js?v=254"></script>
+  <script src="js/notify.js?v=254"></script>
+  <script src="js/ui.js?v=254"></script>
+  <script src="js/app.js?v=254"></script>
+</body>
+</html>
