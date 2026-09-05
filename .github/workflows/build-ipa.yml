@@ -38,7 +38,7 @@ jobs:
       - name: 无签名编译 Debug App（真机 SDK）
         run: |
           cd ios/App
-          xcodebuild -project App.xcodeproj -scheme App -configuration Debug \
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
             -sdk iphoneos -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
 
