@@ -813,12 +813,51 @@ body.lock { overflow: hidden; }
 .cm-ecancel { border: 1px solid var(--line); background: transparent; border-radius: 9px; padding: 7px 14px; color: var(--text2); font-weight: 700; cursor: pointer; }
 .c-title .t { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
 
-/* ===== v2.3：分类管理添加区居中 ===== */
-.cat-new { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; justify-content: center; text-align: center; }
-.cat-new input { flex: 0 1 168px; min-width: 0; }
-.cat-new .icn { width: 62px; text-align: center; flex: 0 0 62px; }
-.cat-new .cols { flex-basis: 100%; justify-content: center; }
-.cat-new .cols button { width: 24px; height: 24px; }
+/* ===== v2.4：分类管理添加区卡片化 ===== */
+.cat-new {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cn-head { display: flex; align-items: center; gap: 10px; }
+.cn-preview {
+  width: 40px; height: 40px; border-radius: 12px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  background: color-mix(in srgb, var(--cc, #FF5E5B) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc, #FF5E5B) 22%, transparent);
+  transition: background .2s, box-shadow .2s;
+}
+.cat-new input {
+  border: 1px solid var(--line); background: var(--card2); border-radius: 10px;
+  padding: 10px 12px; font-size: 14px; outline: none; color: var(--text);
+  transition: border-color .2s;
+}
+.cat-new input:focus { border-color: var(--accent); }
+#cmName { flex: 1; min-width: 0; }
+.cat-new .icn { width: 48px; text-align: center; flex: 0 0 48px; padding: 10px 4px; }
+.cat-new .cols {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; justify-items: center;
+}
+.cat-new .cols button {
+  width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; padding: 0; transition: transform .15s, box-shadow .15s;
+}
+.cat-new .cols button.on {
+  border-color: var(--text); transform: scale(1.12); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cat-ok {
+  width: 100%; border: 0;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: #fff; border-radius: 12px; padding: 12px; font-size: 15px;
+  font-weight: 700; cursor: pointer; letter-spacing: 2px;
+  transition: opacity .15s, transform .1s;
+}
+.cat-ok:active { opacity: .85; transform: scale(.98); }
 /* “色样”文字严格居中 */
 .bg-tile .lab { display: block !important; text-align: center !important; justify-content: normal !important; }
 
