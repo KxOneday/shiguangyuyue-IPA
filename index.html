@@ -15,9 +15,8 @@
   <link rel="apple-touch-icon" href="icons/app.png" />
   <link rel="stylesheet" href="css/app.css?v=254" />
   <style>
-    /* critical：外部 CSS 加载前立即铺底，避免白屏/粉红闪烁 */
-    html, body { margin: 0; padding: 0; background: #f3f4f8; }
-    @media (prefers-color-scheme: dark) { html, body { background: #0d0e12; } }
+    /* critical：消除默认边距；body 背景由 app.css 控制，启动阶段由 #splash 遮罩全覆盖 */
+    html, body { margin: 0; padding: 0; }
     #splash {
       position: fixed; inset: 0; z-index: 99999;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
