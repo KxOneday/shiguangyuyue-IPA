@@ -781,7 +781,7 @@ body.lock { overflow: hidden; }
   padding: 15px 16px; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: .2px;
 }
 .name-block input::placeholder { color: var(--text3); font-weight: 400; }
-.cat-hint { font-size: 12px; color: var(--text3); padding: 2px 6px 10px; line-height: 1.7; }
+.cat-hint { font-size: 12px; color: var(--text3); padding: 10px 6px 10px; line-height: 1.7; }
 .cm-empty { text-align: center; color: var(--text3); padding: 20px; font-size: 13px; }
 .cm-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .cm-row:last-of-type { border-bottom: 0; }
@@ -839,7 +839,7 @@ body.lock { overflow: hidden; }
 }
 .cat-new input:focus { border-color: var(--accent); }
 #cmName { flex: 1; min-width: 0; }
-.cat-new .icn { width: 48px; text-align: center; flex: 0 0 48px; padding: 10px 4px; }
+.cat-new .icn { width: 52px; text-align: center; flex: 0 0 52px; padding: 10px 4px; }
 .cat-new .cols {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; justify-items: center;
 }
