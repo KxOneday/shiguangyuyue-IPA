@@ -1113,13 +1113,6 @@
     } catch (e) { /* 忽略 */ }
     el.textContent = '男友思考中💭';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
-    const tips = {
-      none: '还没设置周期，去月历点任意一天设为「本次开始」即可开启预测。',
-      period: '经期：注意腹部保暖，多喝温水，避免生冷和剧烈运动，保证充足睡眠。',
-      ovulation: '排卵日：分泌物可能清亮拉丝，基础体温略升；备孕请把握今天，非备孕严格防护。',
-      fertile: '易孕期：精子可存活3-5天，备孕建议隔天同房，非备孕请坚持做好防护。',
-      safe: '安全期：排卵已过，怀孕概率较低但非绝对，规律作息为下个周期蓄力。'
-    };
     const prompt = '今天女性生理周期处于' + phaseName + '。请给出一条具体、实用的健康建议（饮食/作息/运动/情绪/护理任选其一），要真正有用，不要空泛的话，30-50字，不要加前缀。';
     callMiMo(prompt, 120).then(text => {
       if (text) {
@@ -1127,7 +1120,7 @@
         el.textContent = t;
         try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, hash: ch, text: t })); } catch (e) { /* 忽略 */ }
       } else {
-        el.textContent = tips[phase] || '规律作息，照顾好自己。';
+        el.textContent = '今天也要好好照顾自己哦～';
       }
     });
   }
@@ -1471,7 +1464,7 @@
       '<div class="pc-grid" id="pcGrid">' + cells + '</div>' +
       legend + summaryHtml +
       '</div>' +
-      renderDayPanel(sel, marks, cycle, cycles, eff, sum);
+      renderDayPanel(sel, marks, cycle, cycles, eff);
 
     // AI 怀孕概率预测：无缓存时触发，完成后重新渲染
     if (!aiProbs) {
@@ -1517,7 +1510,7 @@
     }
   }
 
-  function renderDayPanel(sel, marks, cycle, cycles, eff, sum) {
+  function renderDayPanel(sel, marks, cycle, cycles, eff) {
     const ds = C().ymd(sel);
     const mk = markObj(marks[ds]);
     const kRaw = C().dayKindOf(eff, {}, sel);
@@ -1558,7 +1551,7 @@
     const hasRecord = mk.f || mk.p || mk.mood || mk.c || mk.s.length;
     const isStartDay = cycle.lastStart === ds;
     let endOfCycle = null;
-    for (const k of Object.keys(cycles)) { if (cycles[k].end === ds) { endOfCycle = k; break; } }
+    for (const k of Object.keys(cycles)) { if (cycles[k] === ds) { endOfCycle = k; break; } }
     const isEndDay = !!endOfCycle;
     let cycLine = '';
     if (pi && pi.day >= 0) {
@@ -1636,27 +1629,31 @@
       }
     }
     else if (d.setstart) {
-      // 设置新开始日：把旧开始日存入周期记录（结束日暂记为新开始前一天），确保取消时可恢复
+      // 设置新开始日：保存旧开始日到 prevStart，确保取消时可恢复
       const oldCycle = S().getCycle();
       const keepCycles = S().getCycles();
+      // 旧开始日如果不在 cycles 记录里，补一条（结束日记为新开始前一天）
       if (oldCycle.lastStart && oldCycle.lastStart !== ds && !keepCycles[oldCycle.lastStart]) {
         const dayBefore = C().ymd(C().addDays(C().parseYMD(ds), -1));
         S().putCycleRecord(oldCycle.lastStart, dayBefore);
       }
-      S().setCycle({ lastStart: ds });
+      S().setCycle({ lastStart: ds, prevStart: oldCycle.lastStart || null });
       // 确保历史周期记录不丢失
       for (const k of Object.keys(keepCycles)) {
         if (!S().getCycles()[k]) S().putCycleRecord(k, keepCycles[k]);
       }
     }
     else if (d.clearstart) {
-      // 取消当前开始：恢复到最近一个已记录周期的开始日，推算结果随之恢复
-      const cycRecs = S().getCycles();
-      let prevStart = null;
-      for (const k of Object.keys(cycRecs)) {
-        if (k !== ds && (!prevStart || k > prevStart)) prevStart = k;
+      // 取消当前开始：优先恢复 prevStart，其次从 cycles 记录里找最近的开始日
+      const cur = S().getCycle();
+      let prevStart = cur.prevStart || null;
+      if (!prevStart) {
+        const cycRecs = S().getCycles();
+        for (const k of Object.keys(cycRecs)) {
+          if (k !== ds && (!prevStart || k > prevStart)) prevStart = k;
+        }
       }
-      S().setCycle({ lastStart: prevStart });
+      S().setCycle({ lastStart: prevStart, prevStart: null });
       S().delCycleRecord(ds);
       toast(prevStart ? '已取消，恢复到上一周期推算' : '已取消本次开始');
     }
