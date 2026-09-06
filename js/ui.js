@@ -1678,7 +1678,6 @@
       const per = parseInt(sheetEl.querySelector('#cyPer').value, 10);
       if (!st || !len || !per) { toast('请完整填写', 'err'); return; }
       S().setCycle({ lastStart: st, lastEnd: null, cycleLen: len, periodLen: per });
-      S().trimBeforeStart(st);
       disarm(); closeSheet(); renderPeriodPage(); toast('周期设置已保存');
     };
     const doClear = () => {
