@@ -1089,31 +1089,88 @@
     return fetch('https://api.xiaomimimo.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + MIMO_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 100 })
+      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 200 })
     }).then(r => r.json()).then(data => {
       return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
     }).catch(() => null);
   }
-  function fetchAiTip(dateStr, kind, prob) {
-    const el = document.getElementById('aiTip');
-    if (!el) return;
-    el.textContent = '正在生成今日小贴士...';
-    const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[kind] || '';
-    const prompt = '今天是' + dateStr + '，女性生理周期处于' + kindName + (prob > 0 ? '，当天同房怀孕概率约' + prob + '%' : '') + '。请用一句话给出一条温馨的健康小贴士（饮食、作息、情绪或注意事项），不超过40字，不要加前缀。';
-    callMiMo(prompt, 80).then(text => {
-      if (text) el.textContent = '💡 ' + text.trim();
-      else el.style.display = 'none';
-    });
-  }
+  /* 首页小贴士：每天缓存一条 */
   function fetchHomeTip(phase) {
     const el = document.getElementById('homeTipText');
     if (!el) return;
+    const todayStr = C().ymd(C().todayMid());
+    try {
+      const cached = JSON.parse(localStorage.getItem('mimo_home_tip') || 'null');
+      if (cached && cached.date === todayStr && cached.text) { el.textContent = cached.text; return; }
+    } catch (e) { /* 忽略 */ }
     el.textContent = '正在生成...';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
-    const prompt = '今天女性生理周期处于' + phaseName + '。请用一句话给出一条温馨实用的健康小贴士（饮食、作息、情绪或注意事项），不超过45字，不要加前缀。';
-    callMiMo(prompt, 80).then(text => {
-      if (text) el.textContent = text.trim();
-      else el.textContent = '规律作息，照顾好自己。';
+    const tips = {
+      none: '还没设置周期，去月历点任意一天设为「本次开始」即可开启预测。',
+      period: '经期：注意腹部保暖，多喝温水，避免生冷和剧烈运动，保证睡眠。',
+      ovulation: '排卵日：分泌物可能清亮拉丝，基础体温略升；备孕请把握今天，非备孕严格防护。',
+      fertile: '易孕期：精子可存活3-5天，备孕建议隔天同房，非备孕请坚持防护。',
+      safe: '安全期：排卵已过，怀孕概率低，但非绝对，规律作息为下个周期蓄力。'
+    };
+    const prompt = '今天女性生理周期处于' + phaseName + '。请给出一条具体、实用的健康建议（饮食/作息/运动/情绪/护理任选其一），要真正有用，不要空泛的话，不超过50字，不要加前缀。';
+    callMiMo(prompt, 100).then(text => {
+      if (text) {
+        const t = text.trim();
+        el.textContent = t;
+        try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, text: t })); } catch (e) { /* 忽略 */ }
+      } else {
+        el.textContent = tips[phase] || '规律作息，照顾好自己。';
+      }
+    });
+  }
+  /* AI 怀孕概率预测：每天预测一次，缓存今天+未来7天 */
+  function getAiProbs() {
+    const todayStr = C().ymd(C().todayMid());
+    try {
+      const cached = JSON.parse(localStorage.getItem('mimo_probs') || 'null');
+      if (cached && cached.date === todayStr && cached.probs) return cached.probs;
+    } catch (e) { /* 忽略 */ }
+    return null;
+  }
+  function fetchAiProbs(eff, cycle) {
+    const todayStr = C().ymd(C().todayMid());
+    const today = C().todayMid();
+    const dates = [];
+    for (let i = 0; i < 8; i++) {
+      const d = new Date(today); d.setDate(d.getDate() + i);
+      dates.push(C().ymd(d));
+    }
+    const marks = S().getMarks();
+    const todayKind = C().dayKindOf(eff, marks, today);
+    const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[todayKind] || '未知';
+    const prompt = '你是专业的女性健康顾问。根据以下数据预测未来8天（含今天）每天同房的怀孕概率（0-100的整数百分比）：\n' +
+      '今天：' + C().fmtCN(today) + '，处于' + kindName + '\n' +
+      '周期长度：' + (eff.cycleLen || 28) + '天，经期长度：' + (eff.periodLen || 5) + '天\n' +
+      (cycle.lastStart ? '上次经期开始：' + C().fmtCN(C().parseYMD(cycle.lastStart)) + '\n' : '') +
+      '需要预测的日期：' + dates.join('、') + '\n\n' +
+      '参考：排卵前1天概率最高(约30%)，排卵日约26%，排卵前2天约24%，前3天约16%，前4天约10%，前5天约5%，排卵后1天约5%，其他日期接近0。\n' +
+      '请只返回JSON，key为日期(YYYY-MM-DD)，value为整数百分比，不要其他文字：\n' +
+      '{"' + dates[0] + '":5,"' + dates[1] + '":10,...}';
+    return callMiMo(prompt, 300).then(text => {
+      if (!text) return null;
+      try {
+        const jsonStr = text.replace(/```json|```/g, '').trim();
+        const probs = JSON.parse(jsonStr);
+        const result = {};
+        for (const ds of dates) {
+          const v = parseInt(probs[ds], 10);
+          result[ds] = isNaN(v) ? 0 : Math.max(0, Math.min(100, v));
+        }
+        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, probs: result })); } catch (e) { /* 忽略 */ }
+        return result;
+      } catch (e) { return null; }
+    });
+  }
+  function ensureAiProbs(eff, cycle, callback) {
+    const cached = getAiProbs();
+    if (cached) { if (callback) callback(cached); return; }
+    fetchAiProbs(eff, cycle).then(probs => {
+      if (probs && callback) callback(probs);
     });
   }
 
@@ -1336,10 +1393,16 @@
     const cycle = S().getCycle();
     const cycles = S().getCycles();
     const eff = effectiveCycle(cycle, cycles);
+    const aiProbs = getAiProbs();
     const dim = C().daysInMonth(y, m);
     const firstDow = new Date(y, m - 1, 1).getDay();
     const lead = (firstDow + 6) % 7;
     const lu = window.DM.lunar;
+    const todayStr = C().ymd(today);
+    const inPredictionWindow = (ds) => {
+      const diff = C().dayDiff(C().parseYMD(ds), today);
+      return diff >= 0 && diff <= 7;
+    };
 
     let cells = '';
     for (let i = 0; i < lead; i++) cells += '<div class="pc-cell blank"></div>';
@@ -1352,14 +1415,18 @@
       const actual = (marks[ds] && marks[ds].f > 0) || recHit;
       const isToday = C().ymd(today) === ds;
       const isSel = C().ymd(sel) === ds;
-      const isFertile = (kind === 'fertile' || kind === 'ovulation');
-      const dayProb = isFertile ? C().probForDay(eff, marks, dt) : 0;
+      const inWindow = inPredictionWindow(ds);
+      let dayProb = 0;
+      if (inWindow) {
+        if (aiProbs && aiProbs[ds] != null) dayProb = aiProbs[ds];
+        else dayProb = C().probForDay(eff, marks, dt);
+      }
       let ln = '';
       try { const lt = lu.solarToLunar(y, m, day); if (lt) ln = lt.lDay === 1 ? '初一' : (lt.lDay === 15 ? '十五' : ''); } catch (e) { /* 忽略 */ }
       cells += '<div class="pc-cell ' + kind + (actual ? ' actual' : '') + (isToday ? ' today' : '') + (isSel ? ' sel' : '') + '" data-d="' + ds + '">' +
         '<span class="dn">' + day + '</span>' +
         (ln ? '<span class="ln">' + ln + '</span>' : '<span class="ln"> </span>') +
-        (isFertile ? '<span class="prob">' + dayProb + '%</span>' : '<span class="dk"></span>') +
+        (inWindow && dayProb > 0 ? '<span class="prob">' + dayProb + '%</span>' : '<span class="dk"></span>') +
         '</div>';
     }
 
@@ -1398,10 +1465,10 @@
       '</div>' +
       renderDayPanel(sel, marks, cycle, cycles, eff, sum);
 
-    // AI 小贴士
-    const selKind = C().dayKindOf(eff, marks, sel);
-    const selProb = (selKind === 'fertile' || selKind === 'ovulation') ? C().probForDay(eff, marks, sel) : 0;
-    fetchAiTip(C().fmtCN(sel), selKind, selProb);
+    // AI 怀孕概率预测：无缓存时触发，完成后重新渲染
+    if (!aiProbs) {
+      ensureAiProbs(eff, cycle, () => { renderPeriodPage(); });
+    }
 
     // 事件接线
     el.querySelectorAll('[data-act]').forEach((b) => {
@@ -1450,22 +1517,29 @@
     if (predKind === 'period' && mk.f <= 0 && !cycleInRecords(cycles, sel) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, sel)) predKind = 'normal';
     const kLabel = PC_NAMES[predKind] || '—';
     const actualText = mk.f > 0 ? '经期量：' + ['', '少', '中', '多'][mk.f] : '';
-    const prob = C().probForDay(eff, marks, sel);
+    const localProb = C().probForDay(eff, marks, sel);
+    const aiProbs = getAiProbs();
+    const todayMid = C().todayMid();
+    const selDiff = C().dayDiff(sel, todayMid);
+    const inWindow = selDiff >= 0 && selDiff <= 7;
+    let prob = 0;
+    if (inWindow) {
+      prob = (aiProbs && aiProbs[ds] != null) ? aiProbs[ds] : localProb;
+    }
     const run = actualRunFor(marks, sel);
     const activeCur = !!(cycle.lastStart && !cycles[cycle.lastStart]);
     const runEndMarked = !!(run && cycles[run.start]);
     const runEnd = run && cycles[run.start] ? cycles[run.start] : '';
     const inPredicted = !!C().periodWindowAt(eff, sel);
     const pi = C().periodDayInfo(eff, sel);
-    const showProb = (predKind === 'fertile' || predKind === 'ovulation');
+    const showProb = inWindow && prob > 0;
 
     // 未来的日期默认不可设置，只能查看预测
     if (C().dayDiff(sel, C().todayMid()) > 0) {
       return '<div class="pday">' +
         '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' +
         '<span class="pday-kind ' + predKind + '">预测：' + kLabel + '</span></div>' +
-        (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">若今日同房，怀孕概率约 ' + prob + '%<small>（预测，参考 ACOG + Wilcox NEJM 1995）</small></div>' : '') +
-        '<div class="ai-tip" id="aiTip"></div>' +
+        (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">若今日同房，怀孕概率约 ' + prob + '%<small>（AI 预测，仅供参考）</small></div>' : '') +
         '<div class="pday-hint">🔒 未来的日期只能查看预测，不能记录经期/症状；请在当天再来记录或选择结束日。</div>' +
         '</div>';
     }
@@ -1489,7 +1563,7 @@
       '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' +
       '<span class="pday-kind ' + predKind + '">' + (mk.f > 0 ? '已记录 · 经期' : '预测：' + kLabel) + '</span></div>' +
       (cycLine ? '<div class="pday-cycle">' + cycLine + (activeCur && !runEndMarked ? ' · 实际可能超过' + (eff.periodLen || 5) + '天：干净后请点下方「选择结束日」' : '') + '</div>' : '') +
-      (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">若今日同房，怀孕概率约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : '（较低）') + '</small></div>' : '') +
+      (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">若今日同房，怀孕概率约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : '（较低）') + ' · AI预测</small></div>' : '') +
       (actualText ? '<div class="pday-rec">' + actualText + (mk.p ? ' · 疼痛' + ['', '轻', '中', '重'][mk.p] : '') + (mk.mood ? ' · ' + mk.mood : '') + (mk.c ? ' · ' + mk.c + '色' : '') + (mk.s.length ? ' · ' + mk.s.join('/') : '') + '</div>' : '') +
       '<div class="pday-sec"><span>经期</span><div class="seg pc-seg">' + flowSeg + '</div></div>' +
       '<div class="pday-sec"><span>疼痛</span><div class="seg pc-seg">' + painSeg + '</div></div>' +
@@ -1501,7 +1575,6 @@
       '<button type="button" class="btn ghost sm pc-btn' + (((mk.f > 0 || inPredicted || activeCur) && !runEndMarked) ? ' ok' : '') + '" data-end="1">' + (runEndMarked ? '修改结束日' : '选择结束日') + '</button>' +
       (hasRecord ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearrec="1">清除当日记录</button>' : '') +
       '</div>' +
-      '<div class="ai-tip" id="aiTip"></div>' +
       (runEndMarked ? '<div class="pday-hint">本周期已记录：开始 ' + C().fmtCN(C().parseYMD(run.start)) + ' → 结束 ' + C().fmtCN(C().parseYMD(runEnd)) + '（若选错了，点其它日期即可修改）。</div>' : (activeCur ? '<div class="pday-hint">本次经期已开始、尚未选择结束日。预测约 ' + (eff.periodLen || 5) + ' 天，实际可能第 ' + ((eff.periodLen || 5) + 1) + '、' + ((eff.periodLen || 5) + 2) + ' 天才干净——请在真正结束的那天点「选择结束日」。</div>' : '')) +
       '</div>';
   }
