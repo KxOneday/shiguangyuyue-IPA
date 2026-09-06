@@ -1405,9 +1405,6 @@
 
   function renderDayPanel(sel, marks, cycle, cycles, eff, sum) {
     const ds = C().ymd(sel);
-    const lu = window.DM.lunar;
-    let lunar = '';
-    try { const lt = lu.solarToLunar(sel.getFullYear(), sel.getMonth() + 1, sel.getDate()); if (lt) lunar = '农历' + lu.monthName(lt.lMonth, lt.isLeap) + lu.dayName(lt.lDay); } catch (e) { /* 忽略 */ }
     const mk = markObj(marks[ds]);
     const kRaw = C().dayKindOf(eff, {}, sel);
     let predKind = kRaw;
