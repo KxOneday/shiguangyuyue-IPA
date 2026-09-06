@@ -1095,8 +1095,11 @@
     }).catch(() => null);
   }
   /* 周期状态 hash：周期更新时缓存失效 */
-  function cycleHash(eff, cycle) {
-    return [cycle.lastStart || '', eff.cycleLen || 28, eff.periodLen || 5, (cycle.lastEnd || '')].join('|');
+  function cycleHash(eff, cycle, cycles) {
+    const cyc = cycles || S().getCycles();
+    const keys = Object.keys(cyc).sort();
+    const sig = keys.map(k => k + ':' + (cyc[k] || '')).join(',');
+    return [cycle.lastStart || '', eff.cycleLen || 28, eff.periodLen || 5, keys.length, sig].join('|');
   }
   /* 首页小贴士：每天一条，周期更新时重新生成 */
   function fetchHomeTip(phase, eff, cycle) {
@@ -1633,8 +1636,13 @@
       }
     }
     else if (d.setstart) {
-      // 设置新开始日：保留所有历史周期记录，只更新当前开始日
+      // 设置新开始日：把旧开始日存入周期记录（结束日暂记为新开始前一天），确保取消时可恢复
+      const oldCycle = S().getCycle();
       const keepCycles = S().getCycles();
+      if (oldCycle.lastStart && oldCycle.lastStart !== ds && !keepCycles[oldCycle.lastStart]) {
+        const dayBefore = C().ymd(C().addDays(C().parseYMD(ds), -1));
+        S().putCycleRecord(oldCycle.lastStart, dayBefore);
+      }
       S().setCycle({ lastStart: ds });
       // 确保历史周期记录不丢失
       for (const k of Object.keys(keepCycles)) {
