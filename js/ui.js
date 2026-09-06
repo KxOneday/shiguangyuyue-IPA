@@ -1115,8 +1115,8 @@
     } catch (e) { /* 忽略 */ }
     el.textContent = '男友思考中💭';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
-    const prompt = '今天女性生理周期处于' + phaseName + '。请给出一条具体、实用的健康建议（饮食/作息/运动/情绪/护理任选其一），要真正有用，不要空泛的话，30-50字，不要加前缀。';
-    callMiMo(prompt, 800).then(text => {
+    const prompt = '今天处于' + phaseName + '，给一条30字内的实用健康建议，直接回复建议内容不要解释。';
+    callMiMo(prompt, 400).then(text => {
       if (text) {
         const t = text.trim();
         if (t) {
@@ -1151,24 +1151,20 @@
     const marks = S().getMarks();
     const todayKind = C().dayKindOf(eff, marks, today);
     const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[todayKind] || '未知';
-    const prompt = '你是专业的女性健康顾问。请根据女性生理周期医学知识，预测未来7天（含今天）每天同房的怀孕概率（0-100的整数百分比）。\n' +
-      '已知信息：\n' +
-      '今天：' + C().fmtCN(today) + '，处于' + kindName + '\n' +
-      '周期长度：' + (eff.cycleLen || 28) + '天，经期长度：' + (eff.periodLen || 5) + '天\n' +
-      (cycle.lastStart ? '上次经期开始：' + C().fmtCN(C().parseYMD(cycle.lastStart)) + '\n' : '') +
-      '需要预测的日期：' + dates.join('、') + '\n\n' +
-      '医学常识：排卵日及前后1-2天怀孕概率最高，离排卵日越远概率越低，经期和安全期概率很低。请结合周期数据自行推算排卵日，给出合理的概率值，不要全部相同。\n' +
-      '请只返回JSON，key为日期(YYYY-MM-DD)，value为整数百分比，不要其他文字：\n' +
-      '{"' + dates[0] + '":5,"' + dates[1] + '":10,...}';
-    return callMiMo(prompt, 800).then(text => {
+    const prompt = '今天' + C().fmtCN(today) + '处于' + kindName + '，周期' + (eff.cycleLen || 28) + '天经期' + (eff.periodLen || 5) + '天' +
+      (cycle.lastStart ? '，上次开始' + C().fmtCN(C().parseYMD(cycle.lastStart)) : '') +
+      '。预测未来7天怀孕概率，直接返回JSON，不要解释：{"' + dates.join('":0,"') + '":0}';
+    return callMiMo(prompt, 500).then(text => {
       if (!text) return {};
       try {
         const jsonStr = text.replace(/```json|```/g, '').trim();
         const probs = JSON.parse(jsonStr);
         const result = {};
         for (const ds of dates) {
-          const v = parseInt(probs[ds], 10);
-          result[ds] = isNaN(v) ? 0 : Math.max(0, Math.min(100, v));
+          let v = parseFloat(probs[ds]);
+          if (isNaN(v)) v = 0;
+          if (v > 0 && v <= 1) v = v * 100; // AI可能返回小数(0-1)，转为百分比
+          result[ds] = Math.max(0, Math.min(100, Math.round(v)));
         }
         if (Object.keys(result).length > 0) {
           try { localStorage.setItem('mimo_probs', JSON.stringify({ ver: AI_CACHE_VER, date: todayStr, hash: ch, probs: result })); } catch (e) { /* 忽略 */ }
@@ -1506,9 +1502,9 @@
       '</div>' +
       renderDayPanel(sel, marks, cycle, cycles, eff);
 
-    // AI 怀孕概率预测：无缓存时触发，完成后重新渲染
+    // AI 怀孕概率预测：无缓存时触发，完成后重新渲染（仅当仍在月历页）
     if (!aiProbs) {
-      ensureAiProbs(eff, cycle, () => { renderPeriodPage(); });
+      ensureAiProbs(eff, cycle, () => { if (ui.tab === 'cal') renderPeriodPage(); });
     }
 
     // 事件接线
@@ -1693,6 +1689,7 @@
       for (const k of Object.keys(keepCycles)) {
         if (!S().getCycles()[k]) S().putCycleRecord(k, keepCycles[k]);
       }
+      toast('已设为本次开始，周期已重新推算');
     }
     else if (d.clearstart) {
       // 取消当前开始：优先恢复 prevStart，其次从 cycles 记录里找最近的开始日
