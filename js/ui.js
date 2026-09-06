@@ -1421,13 +1421,14 @@
     const runEnd = run && cycles[run.start] ? cycles[run.start] : '';
     const inPredicted = !!C().periodWindowAt(eff, sel);
     const pi = C().periodDayInfo(eff, sel);
+    const showProb = (predKind === 'fertile' || predKind === 'ovulation');
 
     // 未来的日期默认不可设置，只能查看预测
     if (C().dayDiff(sel, C().todayMid()) > 0) {
       return '<div class="pday">' +
         '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' + (lunar ? '<span class="pday-lunar">' + lunar + '</span>' : '') +
         '<span class="pday-kind ' + predKind + '">预测：' + kLabel + '</span></div>' +
-        '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">当天同房怀孕概率 约 ' + prob + '%<small>（预测，参考 ACOG + Wilcox NEJM 1995）</small></div>' +
+        (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">当天同房怀孕概率 约 ' + prob + '%<small>（预测，参考 ACOG + Wilcox NEJM 1995）</small></div>' : '') +
         '<div class="pday-hint">🔒 未来的日期只能查看预测，不能记录经期/症状；请在当天再来记录或选择结束日。</div>' +
         '</div>';
     }
@@ -1451,7 +1452,7 @@
       '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' + (lunar ? '<span class="pday-lunar">' + lunar + '</span>' : '') +
       '<span class="pday-kind ' + predKind + '">' + (mk.f > 0 ? '已记录 · 经期' : '预测：' + kLabel) + '</span></div>' +
       (cycLine ? '<div class="pday-cycle">' + cycLine + (activeCur && !runEndMarked ? ' · 实际可能超过' + (eff.periodLen || 5) + '天：干净后请点下方「选择结束日」' : '') + '</div>' : '') +
-      '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">当天同房怀孕概率 约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : prob > 0 ? '（较低）' : '（经期/无风险）') + '</small></div>' +
+      (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">当天同房怀孕概率 约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : '（较低）') + '</small></div>' : '') +
       (actualText ? '<div class="pday-rec">' + actualText + (mk.p ? ' · 疼痛' + ['', '轻', '中', '重'][mk.p] : '') + (mk.mood ? ' · ' + mk.mood : '') + (mk.c ? ' · ' + mk.c + '色' : '') + (mk.s.length ? ' · ' + mk.s.join('/') : '') + '</div>' : '') +
       '<div class="pday-sec"><span>经期</span><div class="seg pc-seg">' + flowSeg + '</div></div>' +
       '<div class="pday-sec"><span>疼痛</span><div class="seg pc-seg">' + painSeg + '</div></div>' +
