@@ -240,6 +240,11 @@
     try { localStorage.setItem(CYCLES_KEY, JSON.stringify(c)); } catch (e) { /* 忽略 */ }
     return c;
   }
+  function delCycleRecord(startStr) {
+    const c = getCycles();
+    if (c[startStr] != null) { delete c[startStr]; try { localStorage.setItem(CYCLES_KEY, JSON.stringify(c)); } catch (e) { /* 忽略 */ } }
+    return c;
+  }
   function clearCycles() {
     try { localStorage.removeItem(CYCLES_KEY); } catch (e) { /* 忽略 */ }
   }
@@ -300,6 +305,6 @@
     exportData, importData, sampleEvents,
     setPrefs, getPrefs,
     getMarks, putMark, delMark, getCycle, setCycle,
-    getCycles, putCycleRecord, clearCycles, resetCycleData, trimBeforeStart
+    getCycles, putCycleRecord, delCycleRecord, clearCycles, resetCycleData, trimBeforeStart
   };
 })();
