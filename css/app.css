@@ -239,8 +239,198 @@ html[data-theme="yuyue"] .hm.hc.tip {
   border: 1px solid rgba(255, 140, 90, .2) !important;
 }
 
+/* ========== 哆啦A梦主题 · 动漫风格 ========== */
+html[data-theme="dora"] {
+  --bg: #e8f4fd;
+  --bg-tint: #ffffff;
+  --card: rgba(255, 255, 255, .85);
+  --card2: #f0f8ff;
+  --elev: #ffffff;
+  --text: #1a3a5c;
+  --text2: #4a7a9a;
+  --text3: #8ab4d0;
+  --line: rgba(0, 160, 233, .1);
+  --line2: rgba(0, 160, 233, .2);
+  --accent: #00a0e9;
+  --accent-soft: rgba(0, 160, 233, .15);
+  --accent2: #e83929;
+  --danger: #e83929;
+  --ok: #4caf50;
+  --shadow-card: 0 4px 16px rgba(0, 160, 233, .12), 0 2px 4px rgba(0, 0, 0, .05);
+  --shadow-float: 0 8px 24px rgba(0, 160, 233, .2);
+  --ambient1: rgba(0, 160, 233, .15);
+  --ambient2: rgba(232, 57, 41, .08);
+  --hairline: rgba(0, 160, 233, .08);
+  color-scheme: light;
+}
+
+/* 哆啦A梦背景图 */
+html[data-theme="dora"] body {
+  background:
+    linear-gradient(180deg, rgba(232, 244, 253, .92) 0%, rgba(232, 244, 253, .85) 100%),
+    url('../assets/bg.jpg') center top / cover no-repeat;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* 哆啦A梦卡片：白色圆角 + 蓝色边框 + 阴影 */
+html[data-theme="dora"] .card,
+html[data-theme="dora"] .hm,
+html[data-theme="dora"] .ed-group,
+html[data-theme="dora"] .slist {
+  background: rgba(255, 255, 255, .92) !important;
+  border: 2px solid #00a0e9 !important;
+  border-radius: 20px !important;
+  box-shadow:
+    0 4px 0 #0088cc,
+    0 8px 20px rgba(0, 160, 233, .15) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 卡片顶部红色装饰条 */
+html[data-theme="dora"] .card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #e83929, #ff6b6b, #e83929);
+  opacity: 1 !important;
+}
+
+/* 哆啦A梦按钮：蓝色 + 红色点击效果 */
+html[data-theme="dora"] .save-btn,
+html[data-theme="dora"] .btn-primary,
+html[data-theme="dora"] .pc-prob-btn {
+  background: linear-gradient(180deg, #00b4ff 0%, #00a0e9 50%, #0088cc 100%) !important;
+  border: 2px solid #0077bb !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 4px 0 #0066aa,
+    0 6px 12px rgba(0, 160, 233, .3) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+  transition: all .1s ease !important;
+}
+html[data-theme="dora"] .save-btn:active,
+html[data-theme="dora"] .btn-primary:active,
+html[data-theme="dora"] .pc-prob-btn:active {
+  transform: translateY(3px) !important;
+  box-shadow: 0 1px 0 #0066aa !important;
+}
+
+/* 分段控件 */
+html[data-theme="dora"] .seg {
+  background: rgba(255, 255, 255, .8) !important;
+  border: 2px solid #00a0e9 !important;
+  border-radius: 14px !important;
+  padding: 3px !important;
+}
+html[data-theme="dora"] .seg button {
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+html[data-theme="dora"] .seg button.on {
+  background: linear-gradient(180deg, #00b4ff, #00a0e9) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 4px rgba(0, 160, 233, .3) !important;
+}
+
+/* 底部导航 */
+html[data-theme="dora"] .tabbar {
+  background: rgba(255, 255, 255, .95) !important;
+  border-top: 3px solid #00a0e9 !important;
+  box-shadow: 0 -4px 12px rgba(0, 160, 233, .1) !important;
+}
+html[data-theme="dora"] .tab.on .tic {
+  background: linear-gradient(180deg, #00b4ff, #0088cc) !important;
+  box-shadow: 0 3px 8px rgba(0, 160, 233, .4) !important;
+}
+
+/* 月历 */
+html[data-theme="dora"] .cal-grid {
+  background: rgba(255, 255, 255, .8) !important;
+  border: 2px solid #00a0e9 !important;
+  border-radius: 20px !important;
+  padding: 10px !important;
+}
+html[data-theme="dora"] .cal-cell {
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+}
+html[data-theme="dora"] .cal-cell.today .dn {
+  background: linear-gradient(180deg, #e83929, #cc2222) !important;
+  box-shadow: 0 2px 6px rgba(232, 57, 41, .4) !important;
+}
+html[data-theme="dora"] .cal-cell.period {
+  background: linear-gradient(135deg, rgba(232, 57, 41, .2), rgba(255, 107, 107, .15)) !important;
+}
+html[data-theme="dora"] .cal-cell.fertile {
+  background: linear-gradient(135deg, rgba(255, 217, 0, .3), rgba(255, 180, 0, .25)) !important;
+}
+html[data-theme="dora"] .cal-cell.ovulation {
+  background: linear-gradient(135deg, rgba(232, 57, 41, .35), rgba(255, 107, 107, .3)) !important;
+}
+
+/* 弹窗 */
+html[data-theme="dora"] .sheet,
+html[data-theme="dora"] #sheet {
+  background: linear-gradient(180deg, #f0f8ff 0%, #e8f4fd 100%) !important;
+  border-top: 4px solid #e83929 !important;
+}
+html[data-theme="dora"] .pg {
+  background: linear-gradient(180deg, #f0f8ff 0%, #e8f4fd 100%) !important;
+}
+
+/* 标题文字：蓝色 */
+html[data-theme="dora"] .brand-date,
+html[data-theme="dora"] .td-date b {
+  color: #00a0e9 !important;
+  -webkit-text-fill-color: #00a0e9 !important;
+  background: none !important;
+}
+
+/* 输入框 */
+html[data-theme="dora"] input,
+html[data-theme="dora"] textarea,
+html[data-theme="dora"] select {
+  background: rgba(255, 255, 255, .9) !important;
+  border: 2px solid #00a0e9 !important;
+  border-radius: 12px !important;
+}
+html[data-theme="dora"] input:focus,
+html[data-theme="dora"] textarea:focus {
+  border-color: #e83929 !important;
+  box-shadow: 0 0 0 3px rgba(232, 57, 41, .15) !important;
+}
+
+/* 开关 */
+html[data-theme="dora"] .switch.on {
+  background: linear-gradient(180deg, #00b4ff, #0088cc) !important;
+}
+
+/* 顶部标题栏 */
+html[data-theme="dora"] .brand-logo {
+  background: linear-gradient(135deg, #00a0e9, #0088cc) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 6px rgba(0, 160, 233, .3) !important;
+}
+
+/* 小贴士卡片 */
+html[data-theme="dora"] .hm.hc.tip {
+  background: linear-gradient(135deg, rgba(255, 248, 220, .95), rgba(255, 240, 200, .9)) !important;
+  border: 2px solid #ffd900 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 4px 12px rgba(255, 217, 0, .2) !important;
+}
+
+/* 分类选中 */
+html[data-theme="dora"] .cat-opt.on {
+  background: linear-gradient(180deg, #00b4ff, #0088cc) !important;
+  box-shadow: 0 3px 0 #0066aa !important;
+}
+
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]):not([data-theme="yuyue"]) {
+  html:not([data-theme="light"]):not([data-theme="yuyue"]):not([data-theme="dora"]) {
     --bg: #0d0e12;
     --bg-tint: #101218;
     --card: #171a21;
