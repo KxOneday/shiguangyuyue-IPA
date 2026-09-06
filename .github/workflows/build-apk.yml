@@ -1,4 +1,4 @@
-# 一键打包安卓 APK（GitHub Actions）
+﻿# 一键打包安卓 APK（GitHub Actions）
 # 用法：仓库 Actions 页 → build-apk → Run workflow → 等待完成后下载 app-debug.apk
 name: build-apk
 
@@ -23,7 +23,7 @@ jobs:
       - name: 组装 www 网页资源
         run: |
           mkdir -p www
-          cp -r index.html manifest.webmanifest sw.js css js icons www/
+          cp -r index.html manifest.webmanifest sw.js css js icons assets www/
 
       - name: 安装安卓 SDK
         uses: android-actions/setup-android@v3
