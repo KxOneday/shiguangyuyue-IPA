@@ -1083,96 +1083,37 @@
     );
   }
 
-  /* ---------- AI 小贴士（小米 MiMo） ---------- */
-  function openAiSettings() {
-    const key = localStorage.getItem('mimo_api_key') || '';
-    const enabled = localStorage.getItem('mimo_enabled') === '1';
-    const sheetEl = openSheet(
-      '<div class="sh"><div class="t">AI 小贴士</div><button class="x" data-close="1">' + icon('close') + '</button></div>' +
-      '<div class="ed-body">' +
-      '<div class="ed-group">' +
-      '<div class="ed-row"><span class="lb">API Key</span><span class="ct"><input type="password" id="aiKey" value="' + esc(key) + '" placeholder="sk-..." /></span></div>' +
-      '<div class="ed-row"><span class="lb">启用 AI</span><span class="ct"><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="aiEnabled" ' + (enabled ? 'checked' : '') + ' style="width:18px;height:18px" />开启</label></span></div>' +
-      '</div>' +
-      '<p class="cat-hint">使用小米 MiMo 大模型在生理周期日面板生成个性化健康小贴士。API Key 仅存储在本机 localStorage，不会上传到任何服务器。怀孕概率仍使用本地 ACOG + Wilcox 临床算法，不经过 AI。</p>' +
-      '<button class="save-btn" id="aiSave" type="button">保存</button>' +
-      '</div>'
-    );
-    sheetEl.querySelector('#aiSave').onclick = () => {
-      const k = sheetEl.querySelector('#aiKey').value.trim();
-      const e = sheetEl.querySelector('#aiEnabled').checked;
-      localStorage.setItem('mimo_api_key', k);
-      localStorage.setItem('mimo_enabled', e ? '1' : '0');
-      closeSheet();
-      toast(e ? 'AI 小贴士已开启' : 'AI 小贴士已关闭');
-    };
+  /* ---------- 小米 MiMo AI ---------- */
+  const MIMO_KEY = 'sk-cwy1rgts293yogn09rmmg7zd68xocv4lf08mj58gpjal0r0c';
+  function callMiMo(prompt, maxTokens) {
+    return fetch('https://api.xiaomimimo.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + MIMO_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 100 })
+    }).then(r => r.json()).then(data => {
+      return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    }).catch(() => null);
   }
   function fetchAiTip(dateStr, kind, prob) {
-    const key = localStorage.getItem('mimo_api_key');
-    const enabled = localStorage.getItem('mimo_enabled') === '1';
-    if (!enabled || !key) return;
     const el = document.getElementById('aiTip');
     if (!el) return;
     el.textContent = '正在生成今日小贴士...';
     const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[kind] || '';
     const prompt = '今天是' + dateStr + '，女性生理周期处于' + kindName + (prob > 0 ? '，当天同房怀孕概率约' + prob + '%' : '') + '。请用一句话给出一条温馨的健康小贴士（饮食、作息、情绪或注意事项），不超过40字，不要加前缀。';
-    fetch('https://api.xiaomimimo.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: 80 })
-    }).then(r => r.json()).then(data => {
-      const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    callMiMo(prompt, 80).then(text => {
       if (text) el.textContent = '💡 ' + text.trim();
       else el.style.display = 'none';
-    }).catch(() => { el.style.display = 'none'; });
+    });
   }
-
-  function openAiAnalysis() {
-    const key = localStorage.getItem('mimo_api_key');
-    const enabled = localStorage.getItem('mimo_enabled') === '1';
-    if (!enabled || !key) {
-      toast('请先在设置 → AI 小贴士中配置 API Key 并开启');
-      return;
-    }
-    const cycle = S().getCycle();
-    const cycles = S().getCycles();
-    const eff = effectiveCycle(cycle, cycles);
-    const today = C().todayMid();
-    const sum = periodSummary(eff, today);
-    const kind = C().dayKindOf(eff, S().getMarks(), today);
-    const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[kind] || '未知';
-    // 收集最近周期数据
-    const cycleList = Object.keys(cycles).sort().slice(-6).map((k) => {
-      const c = cycles[k];
-      const start = C().parseYMD(k);
-      const end = c.end ? C().parseYMD(c.end) : null;
-      const len = end ? C().dayDiff(end, start) + 1 : null;
-      return '开始' + C().fmtCN(start) + (len ? '，持续' + len + '天' : '，进行中');
-    }).join('；');
-    const prompt = '你是一位专业的女性健康顾问。以下是用户的月经周期数据：\n' +
-      '当前日期：' + C().fmtCN(today) + '，处于' + kindName + '\n' +
-      '周期长度：' + (eff.cycleLen || 28) + '天，经期长度：' + (eff.periodLen || 5) + '天\n' +
-      (sum && sum.next ? '下次经期预计：' + C().fmtCN(sum.next) + (sum.days != null ? '（还有' + sum.days + '天）' : '') + '\n' : '') +
-      '最近周期记录：' + (cycleList || '暂无') + '\n\n' +
-      '请从以下几个方面给出简洁专业的分析和建议（总字数不超过300字）：\n' +
-      '1. 周期规律性评估\n2. 当前阶段健康建议（饮食/作息/运动/情绪）\n3. 近期注意事项\n' +
-      '用中文，分点列出，语气温暖专业。';
-    const sheetEl = openSheet(
-      '<div class="sh"><div class="t">🤖 AI 健康分析</div><button class="x" data-close="1">' + icon('close') + '</button></div>' +
-      '<div class="ed-body"><div class="ai-analysis" id="aiAnalysis">正在分析您的周期数据，请稍候...</div></div>'
-    );
-    fetch('https://api.xiaomimimo.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: 500 })
-    }).then(r => r.json()).then(data => {
-      const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-      const out = sheetEl.querySelector('#aiAnalysis');
-      if (text) { out.innerHTML = text.replace(/\n/g, '<br>'); }
-      else { out.textContent = '分析失败，请稍后重试。'; }
-    }).catch(() => {
-      const out = sheetEl.querySelector('#aiAnalysis');
-      if (out) out.textContent = '网络错误，请检查连接后重试。';
+  function fetchHomeTip(phase) {
+    const el = document.getElementById('homeTipText');
+    if (!el) return;
+    el.textContent = '正在生成...';
+    const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
+    const prompt = '今天女性生理周期处于' + phaseName + '。请用一句话给出一条温馨实用的健康小贴士（饮食、作息、情绪或注意事项），不超过45字，不要加前缀。';
+    callMiMo(prompt, 80).then(text => {
+      if (text) el.textContent = text.trim();
+      else el.textContent = '规律作息，照顾好自己。';
     });
   }
 
@@ -1450,7 +1391,6 @@
       '<button type="button" class="iconbtn" data-act="today" title="回到今天">今</button>' +
       '<button type="button" class="iconbtn" data-act="next">' + icon('right') + '</button>' +
       '<button type="button" class="iconbtn" data-act="conf" title="周期设置">' + icon('set') + '</button>' +
-      '<button type="button" class="iconbtn ai-btn" data-act="ai" title="AI 健康分析">🤖</button>' +
       '</div>' +
       '<div class="pc-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
       '<div class="pc-grid" id="pcGrid">' + cells + '</div>' +
@@ -1471,7 +1411,6 @@
         else if (a === 'next') slideMonth(1);
         else if (a === 'today') { ui.calYM = { y: today.getFullYear(), m: today.getMonth() + 1 }; renderPeriodPage(); }
         else if (a === 'conf') { openCycleSheet(); }
-        else if (a === 'ai') { openAiAnalysis(); }
       };
     });
     el.querySelectorAll('.pc-cell[data-d]').forEach((c) => {
@@ -1734,81 +1673,6 @@
     c.innerHTML = '<div class="ph"><div class="ph-i">' + emoji + '</div><div class="ph-t">' + esc(title) + '</div><div class="ph-s">' + esc(sub) + '</div></div>';
   }
 
-  /* 按周期阶段划分的小贴士池（每天轮换一条，进入不同阶段自动切池） */
-  const TIP_POOLS = {
-    none: [
-      '还没设置周期：点上方生理期卡片，去月历设“最近开始”，即可开启预测。',
-      '先记录 1 次开始日，App 就会开始推算下次经期。',
-      '想更准，连续记 2-3 个周期的开始与结束。',
-      '设置周期长度(默认28天)与经期长度，可随时在月历 ⚙ 调整。',
-      '数据只存在本机浏览器，换手机记得导出备份。',
-      '小贴士会随你的周期阶段自动变化，多来记录吧。',
-      '身体不舒服随时查看月历里的记录与预测，心里有数。',
-      '今天也在提醒：规律作息是最好的“保健品”。',
-      '有空点开月历认认经期/易孕/排卵的颜色图例。',
-      '完成设置后，首页这张卡片会自动更新成你的阶段状态。',
-      '不必天天记录，开始和结束两天记清楚就很关键。',
-      '打开月历认认经期/易孕/排卵的图例，开始记录预测会更准。'
-    ],
-    period: [
-      '经期注意保暖，腹部热敷能缓解不适。',
-      '少碰生冷和咖啡因，多喝温热的水或红糖姜茶。',
-      '规律作息、保证睡眠，经期会更轻松。',
-      '轻度活动如散步、拉伸有助缓解胀痛。',
-      '及时更换卫生用品，保持干爽清洁。',
-      '心情烦躁很正常，允许自己慢下来。',
-      '经期结束那天记得来点「选择结束日」，记录更准。',
-      '如果经期超过你的设置天数也别慌，按实际点结束即可。',
-      '疼痛影响生活时，请及时咨询医生。',
-      '今天给自己多一点休息和照顾。',
-      '记录一下流量/心情/颜色，久了就是自己的规律库。',
-      '贫血的话多吃红肉、深绿叶菜补铁更舒服。'
-    ],
-    ovulation: [
-      '今天接近排卵日：白带可能像蛋清一样清亮拉丝。',
-      '排卵期基础体温会比平时略高约0.3-0.5℃。',
-      '排卵侧小腹可能有轻微坠胀或刺痛感。',
-      '想备孕：今天前后同房受孕概率最高。',
-      '不想怀孕：今天起请严格防护。',
-      '放松心情，紧张反而不利于排卵规律。',
-      '保持充足睡眠，激素会更稳定。',
-      '咖啡因适量即可，过量可能影响情绪睡眠。',
-      '适当运动促进循环，别做剧烈过度训练。',
-      '留意情绪波动，排卵后激素变化常见。',
-      '今天记录到症状了吗？点开月历顺手记一笔。',
-      '排卵日是估算：结合记录与身体信号更可靠。'
-    ],
-    fertile: [
-      '易孕期接近排卵：精子可存活约5天，请做好安排。',
-      '备孕的话，这两天开始隔天同房较合适。',
-      '非备孕请坚持防护，易孕期概率明显上升。',
-      '分泌物变多、变清亮是正常信号。',
-      '注意休息，别熬夜，激素更平稳。',
-      '放松情绪，压力大会影响排卵节奏。',
-      '可多吃豆制品、全谷物，均衡营养。',
-      '别用热水袋过度热敷腹部以免干扰。',
-      '如果记录排卵试纸，现在正是高峰阶段。',
-      '保持运动但别过度，中等强度即可。',
-      '今天多喝水，帮助身体代谢。',
-      '再坚持几天，排卵结束就进入安全期啦。'
-    ],
-    safe: [
-      '安全期：排卵已过，怀孕概率较低。',
-      '不过安全期并不绝对，非备孕仍建议防护。',
-      '记录这个月的变化，预判会越来越准。',
-      '保持规律作息，为下个周期蓄力。',
-      '可以安排轻运动，把状态练回来。',
-      '饮食清淡些，为下次经期减少水肿。',
-      '心情平稳期，适合处理重要的事。',
-      '距下次经期还有几天，可提前备好用品。',
-      '睡前少看屏幕，睡眠质量高更养身体。',
-      '观察白带渐渐变少变干，都是正常周期信号。',
-      '想更精确可以结合排卵试纸/体温双验证。',
-      '提前预习：下次开始日前后记得来记录。'
-    ]
-  };
-  const PHASE_LABEL = { none: '未设置', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' };
-
   function todayCyclePhase() {
     const today = C().todayMid();
     const cycle = S().getCycle();
@@ -1891,18 +1755,19 @@
     const el = $('content');
     if (!el) return;
     const ph = todayCyclePhase();
-    const pool = TIP_POOLS[ph.phase] || TIP_POOLS.none;
-    const tip = pool[Math.floor(Date.now() / 86400000) % pool.length];
+    const phaseLabel = { none: '未设置', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[ph.phase] || '';
     el.innerHTML =
       '<div class="hm hc tip" id="homeTip">' +
       '<div class="hc-icon">💡</div>' +
       '<div class="hc-body">' +
-      '<div class="hc-t">今日小贴士<span class="hc-tag">' + esc(PHASE_LABEL[ph.phase]) + '</span></div>' +
-      '<div class="hm-tip-t">' + esc(tip) + '</div>' +
+      '<div class="hc-t">今日小贴士<span class="hc-tag">' + esc(phaseLabel) + '</span></div>' +
+      '<div class="hm-tip-t" id="homeTipText">正在生成...</div>' +
       '</div>' +
       '</div>' +
       homeCycleBlock(ph) +
       homeAnnivBlock();
+
+    fetchHomeTip(ph.phase);
 
     const goCal = () => { ui.calYM = null; ui.pday = null; setTab('cal'); };
     const cyc = el.querySelector('#homeCycle'); if (cyc) cyc.onclick = goCal;
@@ -1916,7 +1781,6 @@
     const rows = [
       ['🎨', '外观与主题', 'theme'],
       ['💾', '备份与恢复', 'backup'],
-      ['🤖', 'AI 小贴士', 'ai'],
       ['ℹ️', '关于本应用', 'about']
     ];
     let h = '<div class="page"><div class="ed-group page-list">';
@@ -1928,7 +1792,6 @@
         const a = b.dataset.act;
         if (a === 'theme') openTheme();
         else if (a === 'backup') openBackup();
-        else if (a === 'ai') openAiSettings();
         else if (a === 'about') openAbout();
       };
     });
