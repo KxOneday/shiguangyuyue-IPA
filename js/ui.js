@@ -1632,7 +1632,15 @@
         toast(existed ? '已更新本周期结束日（选错可重选）' : '已记录本周期结束（单周期记录）');
       }
     }
-    else if (d.setstart) { S().setCycle({ lastStart: ds }); }
+    else if (d.setstart) {
+      // 设置新开始日：保留所有历史周期记录，只更新当前开始日
+      const keepCycles = S().getCycles();
+      S().setCycle({ lastStart: ds });
+      // 确保历史周期记录不丢失
+      for (const k of Object.keys(keepCycles)) {
+        if (!S().getCycles()[k]) S().putCycleRecord(k, keepCycles[k]);
+      }
+    }
     else if (d.clearstart) {
       S().setCycle({ lastStart: null });
       S().delCycleRecord(ds);
