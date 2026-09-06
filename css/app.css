@@ -875,6 +875,9 @@ body.lock { overflow: hidden; }
 .pc-cell .dn { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .pc-cell .ln { font-size: 8.5px; color: var(--text3); line-height: 1; height: 10px; }
 .pc-cell .dk { width: 5px; height: 5px; border-radius: 50%; margin-top: auto; margin-bottom: 1px; background: transparent; flex: 0 0 auto; }
+.pc-cell .prob { font-size: 9px; font-weight: 800; margin-top: auto; margin-bottom: 1px; line-height: 1; color: #e8590c; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.pc-cell.fertile .prob { color: #d48806; }
+.pc-cell.ovulation .prob { color: #e8590c; }
 .pc-cell.period { background: rgba(255, 94, 98, .14); }
 .pc-cell.fertile { background: rgba(255, 176, 64, .16); }
 .pc-cell.ovulation { background: rgba(255, 120, 70, .26); }
