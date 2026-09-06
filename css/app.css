@@ -1086,8 +1086,9 @@ html[data-theme="dark"] .sheet.mg .ed-top { background: linear-gradient(135deg, 
 .hm.hc.tip .hc-icon { background: rgba(255, 190, 90, .25); }
 .hm.hc.tip .hc-t { color: #b26a00; }
 .hm.hc.tip .hc-tag { background: rgba(255, 190, 90, .2); color: #b26a00; }
-.hm-tip-t { font-size: 15px; color: var(--text2); line-height: 1.85; margin-top: 7px; }
-.hm.hc.tip { background: linear-gradient(150deg, rgba(255, 190, 90, .12), var(--card) 70%); }
+.hm.hc.tip { overflow: visible; align-items: flex-start; min-height: 80px; padding: 16px 18px; background: linear-gradient(150deg, rgba(255, 190, 90, .12), var(--card) 70%); }
+.hm.hc.tip .hc-body { padding-top: 2px; }
+.hm-tip-t { font-size: 15px; color: var(--text2); line-height: 1.85; margin-top: 8px; word-break: break-word; }
 
 .hm.hc.anni .hc-icon { background: rgba(255, 120, 150, .18); }
 .hm.hc.anni { background: linear-gradient(150deg, rgba(255, 130, 155, .10), var(--card) 72%); }
