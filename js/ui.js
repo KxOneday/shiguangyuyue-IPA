@@ -2216,6 +2216,16 @@
         if (map[sp]) map[sp]();
       }
     } catch (e) { /* 忽略 */ }
+    // 安卓返回键处理：先返回上一层，最后才退出应用
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+      window.Capacitor.Plugins.App.addListener('backButton', () => {
+        if (pgEl) { closeSheet(); return; }
+        if (modalOpen()) { closeModal(); return; }
+        if (ui.pday) { ui.pday = null; renderAll(); return; }
+        if (ui.tab !== 'home') { setTab('home'); return; }
+        window.Capacitor.Plugins.App.exitApp();
+      });
+    }
   }
 
   window.DM = window.DM || {};
