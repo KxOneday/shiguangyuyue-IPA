@@ -2216,15 +2216,36 @@
         if (map[sp]) map[sp]();
       }
     } catch (e) { /* 忽略 */ }
-    // 安卓返回键处理（History API 方式，不依赖 Capacitor 插件）
-    history.pushState({ dm: 'root' }, '');
-    window.addEventListener('popstate', () => {
-      if (pgEl) { closeSheet(); history.pushState({ dm: 'root' }, ''); return; }
-      if (modalOpen()) { closeModal(); history.pushState({ dm: 'root' }, ''); return; }
-      if (ui.pday) { ui.pday = null; renderAll(); history.pushState({ dm: 'root' }, ''); return; }
-      if (ui.tab !== 'home') { setTab('home'); history.pushState({ dm: 'root' }, ''); return; }
-      // 在首页且无弹窗：不重新 pushState，允许退出应用
-    });
+    // 安卓返回键处理：Capacitor App 插件优先，History API 兜底
+    const handleBack = () => {
+      if (pgEl) { closeSheet(); return true; }
+      if (modalOpen()) { closeModal(); return true; }
+      if (ui.pday) { ui.pday = null; renderAll(); return true; }
+      if (ui.tab !== 'home') { setTab('home'); return true; }
+      return false; // 在首页且无弹窗，允许退出
+    };
+    const tryCapacitorBack = () => {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+        window.Capacitor.Plugins.App.addListener('backButton', () => {
+          if (!handleBack()) window.Capacitor.Plugins.App.exitApp();
+        });
+        return true;
+      }
+      return false;
+    };
+    if (!tryCapacitorBack()) {
+      // 兜底：延迟重试，确保 Capacitor 加载完成
+      setTimeout(() => {
+        if (!tryCapacitorBack()) {
+          // 最后兜底：History API
+          history.pushState({ dm: 'root' }, '');
+          window.addEventListener('popstate', () => {
+            handleBack();
+            history.pushState({ dm: 'root' }, '');
+          });
+        }
+      }, 1000);
+    }
   }
 
   window.DM = window.DM || {};
