@@ -1,8 +1,8 @@
-{
+﻿{
   "name": "daoshuri",
   "version": "1.0.0",
   "private": true,
-  "description": "倒数日 · 网页版（仿 Days Matter 的独立实现，纯前端）",
+  "description": "\u5012\u6570\u65e5 \u00b7 \u7f51\u9875\u7248\uff08\u4eff Days Matter \u7684\u72ec\u7acb\u5b9e\u73b0\uff0c\u7eaf\u524d\u7aef\uff09",
   "type": "module",
   "scripts": {
     "start": "node tools/serve.mjs",
@@ -13,6 +13,7 @@
     "@capacitor/android": "^6.0.0",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/core": "^6.0.0",
-    "@capacitor/ios": "^6.0.0"
+    "@capacitor/ios": "^6.0.0",
+    "@capacitor/app": "^6.0.0"
   }
 }
