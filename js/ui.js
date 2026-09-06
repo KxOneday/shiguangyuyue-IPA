@@ -1318,12 +1318,15 @@
       const actual = (marks[ds] && marks[ds].f > 0) || recHit;
       const isToday = C().ymd(today) === ds;
       const isSel = C().ymd(sel) === ds;
+      const isFertile = (kind === 'fertile' || kind === 'ovulation');
+      const dayProb = isFertile ? C().probForDay(eff, marks, dt) : 0;
       let ln = '';
       try { const lt = lu.solarToLunar(y, m, day); if (lt) ln = lt.lDay === 1 ? '初一' : (lt.lDay === 15 ? '十五' : ''); } catch (e) { /* 忽略 */ }
       cells += '<div class="pc-cell ' + kind + (actual ? ' actual' : '') + (isToday ? ' today' : '') + (isSel ? ' sel' : '') + '" data-d="' + ds + '">' +
         '<span class="dn">' + day + '</span>' +
         (ln ? '<span class="ln">' + ln + '</span>' : '<span class="ln"> </span>') +
-        '<span class="dk"></span></div>';
+        (isFertile ? '<span class="prob">' + dayProb + '%</span>' : '<span class="dk"></span>') +
+        '</div>';
     }
 
     // 图例 + 概要
@@ -1345,7 +1348,7 @@
     } else {
       summaryHtml = '';
     }
-    const legend = '<div class="pc-legend"><span class="lg per"></span>经期<span class="lg ovu"></span>排卵日<span class="lg fer"></span>易孕期<span class="lg safe"></span>安全期<span class="lg-note">怀孕概率按排卵模型估算</span></div>';
+    const legend = '<div class="pc-legend"><span class="lg per"></span>经期<span class="lg ovu"></span>排卵日<span class="lg fer"></span>易孕期<span class="lg safe"></span>安全期<span class="lg-note">易孕期底部数字=当天同房怀孕概率</span></div>';
 
     el.innerHTML =
       '<div class="pcal">' +
@@ -1424,7 +1427,7 @@
       return '<div class="pday">' +
         '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' + (lunar ? '<span class="pday-lunar">' + lunar + '</span>' : '') +
         '<span class="pday-kind ' + predKind + '">预测：' + kLabel + '</span></div>' +
-        '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">怀孕概率 约 ' + prob + '%<small>（预测）</small></div>' +
+        '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">当天同房怀孕概率 约 ' + prob + '%<small>（预测，参考 ACOG + Wilcox NEJM 1995）</small></div>' +
         '<div class="pday-hint">🔒 未来的日期只能查看预测，不能记录经期/症状；请在当天再来记录或选择结束日。</div>' +
         '</div>';
     }
@@ -1448,7 +1451,7 @@
       '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' + (lunar ? '<span class="pday-lunar">' + lunar + '</span>' : '') +
       '<span class="pday-kind ' + predKind + '">' + (mk.f > 0 ? '已记录 · 经期' : '预测：' + kLabel) + '</span></div>' +
       (cycLine ? '<div class="pday-cycle">' + cycLine + (activeCur && !runEndMarked ? ' · 实际可能超过' + (eff.periodLen || 5) + '天：干净后请点下方「选择结束日」' : '') + '</div>' : '') +
-      '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">怀孕概率 约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : '（较低）') + '</small></div>' +
+      '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">当天同房怀孕概率 约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : prob > 0 ? '（较低）' : '（经期/无风险）') + '</small></div>' +
       (actualText ? '<div class="pday-rec">' + actualText + (mk.p ? ' · 疼痛' + ['', '轻', '中', '重'][mk.p] : '') + (mk.mood ? ' · ' + mk.mood : '') + (mk.c ? ' · ' + mk.c + '色' : '') + (mk.s.length ? ' · ' + mk.s.join('/') : '') + '</div>' : '') +
       '<div class="pday-sec"><span>经期</span><div class="seg pc-seg">' + flowSeg + '</div></div>' +
       '<div class="pday-sec"><span>疼痛</span><div class="seg pc-seg">' + painSeg + '</div></div>' +
