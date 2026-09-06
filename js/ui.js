@@ -1094,56 +1094,63 @@
       return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
     }).catch(() => null);
   }
-  /* 首页小贴士：每天缓存一条 */
-  function fetchHomeTip(phase) {
+  /* 周期状态 hash：周期更新时缓存失效 */
+  function cycleHash(eff, cycle) {
+    return [cycle.lastStart || '', eff.cycleLen || 28, eff.periodLen || 5, (cycle.lastEnd || '')].join('|');
+  }
+  /* 首页小贴士：每天一条，周期更新时重新生成 */
+  function fetchHomeTip(phase, eff, cycle) {
     const el = document.getElementById('homeTipText');
     if (!el) return;
     const todayStr = C().ymd(C().todayMid());
+    const ch = cycleHash(eff, cycle);
     try {
       const cached = JSON.parse(localStorage.getItem('mimo_home_tip') || 'null');
-      if (cached && cached.date === todayStr && cached.text) { el.textContent = cached.text; return; }
+      if (cached && cached.date === todayStr && cached.hash === ch && cached.text) { el.textContent = cached.text; return; }
     } catch (e) { /* 忽略 */ }
     el.textContent = '正在生成...';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
     const tips = {
       none: '还没设置周期，去月历点任意一天设为「本次开始」即可开启预测。',
-      period: '经期：注意腹部保暖，多喝温水，避免生冷和剧烈运动，保证睡眠。',
+      period: '经期：注意腹部保暖，多喝温水，避免生冷和剧烈运动，保证充足睡眠。',
       ovulation: '排卵日：分泌物可能清亮拉丝，基础体温略升；备孕请把握今天，非备孕严格防护。',
-      fertile: '易孕期：精子可存活3-5天，备孕建议隔天同房，非备孕请坚持防护。',
-      safe: '安全期：排卵已过，怀孕概率低，但非绝对，规律作息为下个周期蓄力。'
+      fertile: '易孕期：精子可存活3-5天，备孕建议隔天同房，非备孕请坚持做好防护。',
+      safe: '安全期：排卵已过，怀孕概率较低但非绝对，规律作息为下个周期蓄力。'
     };
-    const prompt = '今天女性生理周期处于' + phaseName + '。请给出一条具体、实用的健康建议（饮食/作息/运动/情绪/护理任选其一），要真正有用，不要空泛的话，不超过50字，不要加前缀。';
-    callMiMo(prompt, 100).then(text => {
+    const prompt = '今天女性生理周期处于' + phaseName + '。请给出一条具体、实用的健康建议（饮食/作息/运动/情绪/护理任选其一），要真正有用，不要空泛的话，30-50字，不要加前缀。';
+    callMiMo(prompt, 120).then(text => {
       if (text) {
         const t = text.trim();
         el.textContent = t;
-        try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, text: t })); } catch (e) { /* 忽略 */ }
+        try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, hash: ch, text: t })); } catch (e) { /* 忽略 */ }
       } else {
         el.textContent = tips[phase] || '规律作息，照顾好自己。';
       }
     });
   }
-  /* AI 怀孕概率预测：每天预测一次，缓存今天+未来7天 */
-  function getAiProbs() {
+  /* AI 怀孕概率预测：每天预测一次，缓存今天+未来6天（共7天），周期更新时重新预测 */
+  function getAiProbs(eff, cycle) {
     const todayStr = C().ymd(C().todayMid());
+    const ch = cycleHash(eff, cycle);
     try {
       const cached = JSON.parse(localStorage.getItem('mimo_probs') || 'null');
-      if (cached && cached.date === todayStr && cached.probs) return cached.probs;
+      if (cached && cached.date === todayStr && cached.hash === ch && cached.probs) return cached.probs;
     } catch (e) { /* 忽略 */ }
     return null;
   }
   function fetchAiProbs(eff, cycle) {
     const todayStr = C().ymd(C().todayMid());
+    const ch = cycleHash(eff, cycle);
     const today = C().todayMid();
     const dates = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 7; i++) {
       const d = new Date(today); d.setDate(d.getDate() + i);
       dates.push(C().ymd(d));
     }
     const marks = S().getMarks();
     const todayKind = C().dayKindOf(eff, marks, today);
     const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[todayKind] || '未知';
-    const prompt = '你是专业的女性健康顾问。根据以下数据预测未来8天（含今天）每天同房的怀孕概率（0-100的整数百分比）：\n' +
+    const prompt = '你是专业的女性健康顾问。根据以下数据预测未来7天（含今天）每天同房的怀孕概率（0-100的整数百分比）：\n' +
       '今天：' + C().fmtCN(today) + '，处于' + kindName + '\n' +
       '周期长度：' + (eff.cycleLen || 28) + '天，经期长度：' + (eff.periodLen || 5) + '天\n' +
       (cycle.lastStart ? '上次经期开始：' + C().fmtCN(C().parseYMD(cycle.lastStart)) + '\n' : '') +
@@ -1161,13 +1168,13 @@
           const v = parseInt(probs[ds], 10);
           result[ds] = isNaN(v) ? 0 : Math.max(0, Math.min(100, v));
         }
-        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, probs: result })); } catch (e) { /* 忽略 */ }
+        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: result })); } catch (e) { /* 忽略 */ }
         return result;
       } catch (e) { return null; }
     });
   }
   function ensureAiProbs(eff, cycle, callback) {
-    const cached = getAiProbs();
+    const cached = getAiProbs(eff, cycle);
     if (cached) { if (callback) callback(cached); return; }
     fetchAiProbs(eff, cycle).then(probs => {
       if (probs && callback) callback(probs);
@@ -1401,7 +1408,7 @@
     const todayStr = C().ymd(today);
     const inPredictionWindow = (ds) => {
       const diff = C().dayDiff(C().parseYMD(ds), today);
-      return diff >= 0 && diff <= 7;
+      return diff >= 0 && diff <= 6;
     };
 
     let cells = '';
@@ -1521,7 +1528,7 @@
     const aiProbs = getAiProbs();
     const todayMid = C().todayMid();
     const selDiff = C().dayDiff(sel, todayMid);
-    const inWindow = selDiff >= 0 && selDiff <= 7;
+    const inWindow = selDiff >= 0 && selDiff <= 6;
     let prob = 0;
     if (inWindow) {
       prob = (aiProbs && aiProbs[ds] != null) ? aiProbs[ds] : localProb;
@@ -1840,7 +1847,7 @@
       homeCycleBlock(ph) +
       homeAnnivBlock();
 
-    fetchHomeTip(ph.phase);
+    fetchHomeTip(ph.phase, ph.eff, ph.cycle);
 
     const goCal = () => { ui.calYM = null; ui.pday = null; setTab('cal'); };
     const cyc = el.querySelector('#homeCycle'); if (cyc) cyc.onclick = goCal;
