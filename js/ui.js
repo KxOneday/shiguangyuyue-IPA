@@ -2216,16 +2216,15 @@
         if (map[sp]) map[sp]();
       }
     } catch (e) { /* 忽略 */ }
-    // 安卓返回键处理：先返回上一层，最后才退出应用
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
-      window.Capacitor.Plugins.App.addListener('backButton', () => {
-        if (pgEl) { closeSheet(); return; }
-        if (modalOpen()) { closeModal(); return; }
-        if (ui.pday) { ui.pday = null; renderAll(); return; }
-        if (ui.tab !== 'home') { setTab('home'); return; }
-        window.Capacitor.Plugins.App.exitApp();
-      });
-    }
+    // 安卓返回键处理（History API 方式，不依赖 Capacitor 插件）
+    history.pushState({ dm: 'root' }, '');
+    window.addEventListener('popstate', () => {
+      if (pgEl) { closeSheet(); history.pushState({ dm: 'root' }, ''); return; }
+      if (modalOpen()) { closeModal(); history.pushState({ dm: 'root' }, ''); return; }
+      if (ui.pday) { ui.pday = null; renderAll(); history.pushState({ dm: 'root' }, ''); return; }
+      if (ui.tab !== 'home') { setTab('home'); history.pushState({ dm: 'root' }, ''); return; }
+      // 在首页且无弹窗：不重新 pushState，允许退出应用
+    });
   }
 
   window.DM = window.DM || {};
