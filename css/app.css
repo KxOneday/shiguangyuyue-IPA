@@ -491,7 +491,7 @@ body.lock { overflow: hidden; }
   font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text2);
   transition: all .18s ease;
 }
-.cat-opt.on { color: #fff; border-color: transparent; box-shadow: 0 3px 10px rgba(24, 26, 32, .12); }
+.cat-opt.on { color: #fff; border-color: transparent; box-shadow: 0 3px 10px color-mix(in srgb, var(--text) 12%, transparent); }
 .cat-opt .dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent); }
 .cat-opt.mgmt { color: var(--accent); border-style: dashed; }
 
@@ -512,7 +512,7 @@ body.lock { overflow: hidden; }
   background: var(--card2); background-size: cover; background-position: center; cursor: pointer;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.switch { position: relative; width: 48px; height: 28px; flex: 0 0 auto; border-radius: 15px; border: 0; background: #d3d6dd; cursor: pointer; transition: background .2s; }
+.switch { position: relative; width: 48px; height: 28px; flex: 0 0 auto; border-radius: 15px; border: 0; background: var(--line2); cursor: pointer; transition: background .2s; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0, 0, 0, .25); transition: transform .22s cubic-bezier(.32,.72,.24,1); }
 .switch.on { background: var(--ok); }
 .switch.on::after { transform: translateX(20px); }
@@ -522,7 +522,7 @@ body.lock { overflow: hidden; }
 .save-btn {
   width: 100%; border: 0; cursor: pointer; border-radius: 18px; padding: 16px; font-size: 16px; font-weight: 800;
   color: #fff; background: linear-gradient(135deg, var(--accent2), var(--accent));
-  box-shadow: 0 10px 24px rgba(255, 94, 98, .4); margin-top: 4px; letter-spacing: 2px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 40%, transparent); margin-top: 4px; letter-spacing: 2px;
   transition: transform .12s ease;
 }
 .save-btn:active { transform: scale(.98); }
