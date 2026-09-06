@@ -1385,6 +1385,25 @@
   function effectiveCycle(cycle, cycles) {
     return { lastStart: cycle.lastStart, lastEnd: null, cycleLen: cycle.cycleLen || 28, periodLen: cycle.periodLen || 5 };
   }
+  /** 历史周期状态推算：对于早于当前 lastStart 的日期，找到所属历史周期并推算经期/排卵日/易孕期 */
+  function historicalDayKind(cycles, eff, date) {
+    let bestStart = null;
+    for (const k of Object.keys(cycles || {})) {
+      const sd = C().parseYMD(k);
+      if (sd && C().dayDiff(date, sd) >= 0 && (!bestStart || C().dayDiff(sd, bestStart) > 0)) bestStart = k;
+    }
+    if (!bestStart) return null;
+    const histCycle = { lastStart: bestStart, cycleLen: eff.cycleLen || 28, periodLen: eff.periodLen || 5 };
+    const kind = C().dayKindOf(histCycle, {}, date);
+    // 如果该日期在历史周期的结束日之后，且不在下一个周期的预测范围内，返回 normal
+    const endStr = cycles[bestStart];
+    if (endStr && C().dayDiff(date, C().parseYMD(endStr)) > 0) {
+      // 检查是否在下一个周期的预测经期/易孕期内
+      const nextStart = C().addDays(C().parseYMD(bestStart), eff.cycleLen || 28);
+      if (C().dayDiff(date, nextStart) < 0) return 'normal';
+    }
+    return kind;
+  }
 
   function renderPeriodPage() {
     const el = $('content');
@@ -1415,6 +1434,11 @@
       const ds = C().ymd(dt);
       const recHit = cycleInRecords(cycles, dt); // 已记录周期的开始~结束整段都算经期
       let kind = recHit ? 'period' : C().dayKindOf(eff, marks, dt);
+      // 早于当前开始日的日期：用历史周期推算易孕期/排卵日，避免设置新周期后旧周期预测消失
+      if (kind === 'normal' && !recHit && eff.lastStart && C().dayDiff(dt, C().parseYMD(eff.lastStart)) < 0) {
+        const hk = historicalDayKind(cycles, eff, dt);
+        if (hk) kind = hk;
+      }
       if (kind === 'period' && !recHit && !(marks[ds] && marks[ds].f > 0) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, dt)) kind = 'normal';
       const actual = (marks[ds] && marks[ds].f > 0) || recHit;
       const isToday = C().ymd(today) === ds;
@@ -1515,6 +1539,10 @@
     const mk = markObj(marks[ds]);
     const kRaw = C().dayKindOf(eff, {}, sel);
     let predKind = kRaw;
+    if (predKind === 'normal' && eff.lastStart && C().dayDiff(sel, C().parseYMD(eff.lastStart)) < 0) {
+      const hk = historicalDayKind(cycles, eff, sel);
+      if (hk) predKind = hk;
+    }
     if (predKind === 'period' && mk.f <= 0 && !cycleInRecords(cycles, sel) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, sel)) predKind = 'normal';
     const kLabel = PC_NAMES[predKind] || '—';
     const actualText = mk.f > 0 ? '经期量：' + ['', '少', '中', '多'][mk.f] : '';
@@ -1632,10 +1660,10 @@
       // 设置新开始日：保存旧开始日到 prevStart，确保取消时可恢复
       const oldCycle = S().getCycle();
       const keepCycles = S().getCycles();
-      // 旧开始日如果不在 cycles 记录里，补一条（结束日记为新开始前一天）
+      // 旧开始日如果不在 cycles 记录里，补一条（结束日记为旧开始日+经期长度-1）
       if (oldCycle.lastStart && oldCycle.lastStart !== ds && !keepCycles[oldCycle.lastStart]) {
-        const dayBefore = C().ymd(C().addDays(C().parseYMD(ds), -1));
-        S().putCycleRecord(oldCycle.lastStart, dayBefore);
+        const periodEnd = C().ymd(C().addDays(C().parseYMD(oldCycle.lastStart), (oldCycle.periodLen || 5) - 1));
+        S().putCycleRecord(oldCycle.lastStart, periodEnd);
       }
       S().setCycle({ lastStart: ds, prevStart: oldCycle.lastStart || null });
       // 确保历史周期记录不丢失
