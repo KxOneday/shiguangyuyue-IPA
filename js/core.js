@@ -117,9 +117,11 @@
     return best;
   }
   /** 日期状态：'period' 经期 / 'ovulation' 排卵 / 'fertile' 易孕 / 'normal'
-   *  推算依据（医学通用模型）：排卵 ≈ 下次经期前 14 天（黄体期 14 天），
-   *  卵子可存活约 12-24 小时、精子约 5 天 → 易孕期 = 排卵前 5 天 ~ 排卵后 1 天
-   *  仅从“用户设置的开始日”起推算，之前的日期一律 normal/空白 */
+   *  推算依据（ACOG 美国妇产科医师学会 + Wilcox et al. NEJM 1995）：
+   *  排卵 ≈ 下次经期前 14 天（黄体期约 14 天，相对固定）
+   *  精子在女性生殖道可存活 3-5 天，卵子排出后可存活 12-24 小时
+   *  → 易孕期 = 排卵前 5 天 ~ 排卵后 1 天（含排卵日当天）
+   *  仅从"用户设置的开始日"起推算，之前的日期一律 normal/空白 */
   function dayKindOf(cycle, marks, date) {
     const ds = ymd(date);
     if (marks && marks[ds] && (marks[ds].f || 0) > 0) return 'period';
@@ -150,26 +152,29 @@
     const info = cycleLenInfo(cycle);
     return addDays(parseYMD(cycle.lastStart), info.L - 1);
   }
-  /** 怀孕概率估算（0-100，仅供估算，参照临床常用阶梯） */
+  /** 怀孕概率估算（0-100，仅供参考）
+   *  数据参考：Wilcox et al. NEJM 1995（单次同房受孕概率临床研究）
+   *  + ACOG 委员会意见：排卵前 1 天受孕概率最高，排卵日次之
+   *  精子存活 3-5 天，卵子存活 12-24 小时 */
   function probForDay(cycle, marks, date) {
     const ds = ymd(date);
     if (marks && marks[ds] && (marks[ds].f || 0) > 0) return 0;
     if (!cycle || !cycle.lastStart) return 0;
     const start = parseYMD(cycle.lastStart);
-    if (dayDiff(date, start) < 0) return 0; // 开始日之前不推算
-    if (periodWindowAt(cycle, date)) return 0; // 经期≈0
+    if (dayDiff(date, start) < 0) return 0;
+    if (periodWindowAt(cycle, date)) return 0;
     const ov = ovulationNear(cycle, date);
     const dd = dayDiff(date, ov);
-    if (dd === 0) return 90;    // 排卵日
-    if (dd === -1) return 70;   // 排卵前1天
-    if (dd === -2) return 55;
-    if (dd === -3) return 40;
-    if (dd === -4) return 25;
-    if (dd === -5) return 12;
-    if (dd === 1) return 25;    // 卵子排出后约12-24h仍可能受孕
-    if (dd === 2) return 8;
-    if (dd === 3) return 3;
-    return 1;
+    if (dd === -1) return 30;   // 排卵前1天（临床最高）
+    if (dd === 0) return 26;    // 排卵日
+    if (dd === -2) return 24;   // 排卵前2天
+    if (dd === -3) return 16;   // 排卵前3天
+    if (dd === -4) return 10;   // 排卵前4天
+    if (dd === -5) return 5;    // 排卵前5天（精子存活上限）
+    if (dd === 1) return 5;     // 排卵后1天（卵子仍可能存活）
+    if (dd === 2) return 2;
+    if (dd === 3) return 1;
+    return 0;
   }
 
   /* ---------- 事件 → 目标日期解析 ---------- */
