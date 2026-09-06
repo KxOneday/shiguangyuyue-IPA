@@ -1108,7 +1108,7 @@
       const cached = JSON.parse(localStorage.getItem('mimo_home_tip') || 'null');
       if (cached && cached.date === todayStr && cached.hash === ch && cached.text) { el.textContent = cached.text; return; }
     } catch (e) { /* 忽略 */ }
-    el.textContent = '正在生成...';
+    el.textContent = '男友思考中💭';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
     const tips = {
       none: '还没设置周期，去月历点任意一天设为「本次开始」即可开启预测。',
@@ -1433,7 +1433,7 @@
       cells += '<div class="pc-cell ' + kind + (actual ? ' actual' : '') + (isToday ? ' today' : '') + (isSel ? ' sel' : '') + '" data-d="' + ds + '">' +
         '<span class="dn">' + day + '</span>' +
         (ln ? '<span class="ln">' + ln + '</span>' : '<span class="ln"> </span>') +
-        (inWindow && dayProb > 0 ? '<span class="prob">' + dayProb + '%</span>' : '<span class="dk"></span>') +
+        (inWindow ? '<span class="prob">' + dayProb + '%</span>' : '<span class="dk"></span>') +
         '</div>';
     }
 
@@ -1539,7 +1539,7 @@
     const runEnd = run && cycles[run.start] ? cycles[run.start] : '';
     const inPredicted = !!C().periodWindowAt(eff, sel);
     const pi = C().periodDayInfo(eff, sel);
-    const showProb = inWindow && prob > 0;
+    const showProb = inWindow;
 
     // 未来的日期默认不可设置，只能查看预测
     if (C().dayDiff(sel, C().todayMid()) > 0) {
@@ -1558,6 +1558,10 @@
     const colorHtml = PC_COLORS.map((cc) => '<button type="button" class="pc-opt pc-color' + (mk.c === cc ? ' on' : '') + '" data-c="' + cc + '"><i class="dot" style="background:' + PC_COLOR_HEX[cc] + '"></i>' + cc + '</button>').join('');
 
     const hasRecord = mk.f || mk.p || mk.mood || mk.c || mk.s.length;
+    const isStartDay = cycle.lastStart === ds;
+    let endOfCycle = null;
+    for (const k of Object.keys(cycles)) { if (cycles[k].end === ds) { endOfCycle = k; break; } }
+    const isEndDay = !!endOfCycle;
     let cycLine = '';
     if (pi && pi.day >= 0) {
       if (mk.f > 0 || (cycle.lastStart && run)) {
@@ -1578,8 +1582,8 @@
       '<div class="pday-sec"><span>症状</span><div class="pday-scroll">' + sympHtml + '</div></div>' +
       '<div class="pday-sec"><span>颜色</span><div class="pday-scroll">' + colorHtml + '</div></div>' +
       '<div class="pday-ops">' +
-      '<button type="button" class="btn ghost sm pc-btn" data-setstart="1">设为本次开始</button>' +
-      '<button type="button" class="btn ghost sm pc-btn' + (((mk.f > 0 || inPredicted || activeCur) && !runEndMarked) ? ' ok' : '') + '" data-end="1">' + (runEndMarked ? '修改结束日' : '选择结束日') + '</button>' +
+      (isStartDay ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearstart="1">取消开始</button>' : '<button type="button" class="btn ghost sm pc-btn" data-setstart="1">设为本次开始</button>') +
+      (isEndDay ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearend="1">取消结束</button>' : '<button type="button" class="btn ghost sm pc-btn' + (((mk.f > 0 || inPredicted || activeCur) && !runEndMarked) ? ' ok' : '') + '" data-end="1">' + (runEndMarked ? '修改结束日' : '选择结束日') + '</button>') +
       (hasRecord ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearrec="1">清除当日记录</button>' : '') +
       '</div>' +
       (runEndMarked ? '<div class="pday-hint">本周期已记录：开始 ' + C().fmtCN(C().parseYMD(run.start)) + ' → 结束 ' + C().fmtCN(C().parseYMD(runEnd)) + '（若选错了，点其它日期即可修改）。</div>' : (activeCur ? '<div class="pday-hint">本次经期已开始、尚未选择结束日。预测约 ' + (eff.periodLen || 5) + ' 天，实际可能第 ' + ((eff.periodLen || 5) + 1) + '、' + ((eff.periodLen || 5) + 2) + ' 天才干净——请在真正结束的那天点「选择结束日」。</div>' : '')) +
@@ -1634,6 +1638,17 @@
       }
     }
     else if (d.setstart) { S().setCycle({ lastStart: ds }); S().trimBeforeStart(ds); }
+    else if (d.clearstart) {
+      S().setCycle({ lastStart: null });
+      S().delCycleRecord(ds);
+      toast('已取消本次开始');
+    }
+    else if (d.clearend) {
+      const cycRecs = S().getCycles();
+      for (const k of Object.keys(cycRecs)) {
+        if (cycRecs[k] === ds) { S().delCycleRecord(k); toast('已取消结束日'); break; }
+      }
+    }
     else if (d.clearrec) { S().delMark(ds); }
     // 清理空记录
     const nm = markObj(S().getMarks()[ds]);
