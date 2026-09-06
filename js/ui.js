@@ -1089,7 +1089,7 @@
     return fetch('https://api.xiaomimimo.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + MIMO_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 200 })
+      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 800 })
     }).then(r => r.json()).then(data => {
       return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
     }).catch(() => null);
@@ -1114,13 +1114,15 @@
     el.textContent = '男友思考中💭';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
     const prompt = '今天女性生理周期处于' + phaseName + '。请给出一条具体、实用的健康建议（饮食/作息/运动/情绪/护理任选其一），要真正有用，不要空泛的话，30-50字，不要加前缀。';
-    callMiMo(prompt, 120).then(text => {
+    callMiMo(prompt, 800).then(text => {
       if (text) {
         const t = text.trim();
         el.textContent = t;
         try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, hash: ch, text: t })); } catch (e) { /* 忽略 */ }
       } else {
-        el.textContent = '今天也要好好照顾自己哦～';
+        const fallback = '今天也要好好照顾自己哦～';
+        el.textContent = fallback;
+        try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, hash: ch, text: fallback })); } catch (e) { /* 忽略 */ }
       }
     });
   }
@@ -1155,8 +1157,11 @@
       '医学常识：排卵日及前后1-2天怀孕概率最高，离排卵日越远概率越低，经期和安全期概率很低。请结合周期数据自行推算排卵日，给出合理的概率值，不要全部相同。\n' +
       '请只返回JSON，key为日期(YYYY-MM-DD)，value为整数百分比，不要其他文字：\n' +
       '{"' + dates[0] + '":5,"' + dates[1] + '":10,...}';
-    return callMiMo(prompt, 300).then(text => {
-      if (!text) return null;
+    return callMiMo(prompt, 800).then(text => {
+      if (!text) {
+        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: {} })); } catch (e) { /* 忽略 */ }
+        return {};
+      }
       try {
         const jsonStr = text.replace(/```json|```/g, '').trim();
         const probs = JSON.parse(jsonStr);
@@ -1167,14 +1172,17 @@
         }
         try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: result })); } catch (e) { /* 忽略 */ }
         return result;
-      } catch (e) { return null; }
+      } catch (e) {
+        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: {} })); } catch (e2) { /* 忽略 */ }
+        return {};
+      }
     });
   }
   function ensureAiProbs(eff, cycle, callback) {
     const cached = getAiProbs(eff, cycle);
     if (cached) { if (callback) callback(cached); return; }
     fetchAiProbs(eff, cycle).then(probs => {
-      if (probs && callback) callback(probs);
+      if (callback) callback(probs || {});
     });
   }
 
@@ -1395,13 +1403,8 @@
     if (!bestStart) return null;
     const histCycle = { lastStart: bestStart, cycleLen: eff.cycleLen || 28, periodLen: eff.periodLen || 5 };
     const kind = C().dayKindOf(histCycle, {}, date);
-    // 如果该日期在历史周期的结束日之后，且不在下一个周期的预测范围内，返回 normal
-    const endStr = cycles[bestStart];
-    if (endStr && C().dayDiff(date, C().parseYMD(endStr)) > 0) {
-      // 检查是否在下一个周期的预测经期/易孕期内
-      const nextStart = C().addDays(C().parseYMD(bestStart), eff.cycleLen || 28);
-      if (C().dayDiff(date, nextStart) < 0) return 'normal';
-    }
+    // 历史周期只显示经期，不显示易孕期/排卵日
+    if (kind === 'fertile' || kind === 'ovulation') return 'normal';
     return kind;
   }
 
@@ -1434,10 +1437,14 @@
       const ds = C().ymd(dt);
       const recHit = cycleInRecords(cycles, dt); // 已记录周期的开始~结束整段都算经期
       let kind = recHit ? 'period' : C().dayKindOf(eff, marks, dt);
-      // 早于当前开始日的日期：用历史周期推算易孕期/排卵日，避免设置新周期后旧周期预测消失
+      // 早于当前开始日的日期：用历史周期推算（只显示经期）
       if (kind === 'normal' && !recHit && eff.lastStart && C().dayDiff(dt, C().parseYMD(eff.lastStart)) < 0) {
         const hk = historicalDayKind(cycles, eff, dt);
         if (hk) kind = hk;
+      }
+      // 未来周期（当前周期之后）只显示经期，不显示易孕期/排卵日
+      if (eff.lastStart && C().dayDiff(dt, C().parseYMD(eff.lastStart)) >= (eff.cycleLen || 28)) {
+        if (kind === 'fertile' || kind === 'ovulation') kind = 'normal';
       }
       if (kind === 'period' && !recHit && !(marks[ds] && marks[ds].f > 0) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, dt)) kind = 'normal';
       const actual = (marks[ds] && marks[ds].f > 0) || recHit;
@@ -1542,6 +1549,10 @@
     if (predKind === 'normal' && eff.lastStart && C().dayDiff(sel, C().parseYMD(eff.lastStart)) < 0) {
       const hk = historicalDayKind(cycles, eff, sel);
       if (hk) predKind = hk;
+    }
+    // 未来周期只显示经期，不显示易孕期/排卵日
+    if (eff.lastStart && C().dayDiff(sel, C().parseYMD(eff.lastStart)) >= (eff.cycleLen || 28)) {
+      if (predKind === 'fertile' || predKind === 'ovulation') predKind = 'normal';
     }
     if (predKind === 'period' && mk.f <= 0 && !cycleInRecords(cycles, sel) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, sel)) predKind = 'normal';
     const kLabel = PC_NAMES[predKind] || '—';
