@@ -938,8 +938,6 @@ body.lock { overflow: hidden; }
 .pc-btn.ok { border-color: var(--accent); color: var(--accent); }
 .pday-hint { margin-top: 10px; font-size: 12px; color: var(--text3); line-height: 1.6; }
 .ai-tip { margin-top: 10px; font-size: 13px; color: var(--text2); background: linear-gradient(135deg, rgba(155, 89, 182, .08), rgba(52, 152, 219, .08)); padding: 10px 14px; border-radius: 10px; border-left: 3px solid #9b59b6; line-height: 1.6; min-height: 20px; }
-.ai-btn { font-size: 16px !important; }
-.ai-analysis { font-size: 14px; color: var(--text); line-height: 1.8; white-space: pre-wrap; padding: 8px 4px; }
 
 /* ===== v2.7 微调 ===== */
 /* 卡片倒计时：还有 N 天 单行，还有二字在前、整体居中 */
