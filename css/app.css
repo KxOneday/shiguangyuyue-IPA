@@ -79,6 +79,166 @@ html[data-theme="yuyue"] {
   color-scheme: light;
 }
 
+/* ========== 屿月主题 · 完整视觉渲染 ========== */
+html[data-theme="yuyue"] body {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 140, 90, .25), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(167, 139, 250, .22), transparent 55%),
+    radial-gradient(ellipse 70% 60% at 50% 100%, rgba(255, 180, 120, .15), transparent 60%),
+    linear-gradient(160deg, #fef6ee 0%, #faf0ff 50%, #f0f4ff 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* 玻璃拟态卡片 */
+html[data-theme="yuyue"] .card,
+html[data-theme="yuyue"] .hm,
+html[data-theme="yuyue"] .ed-group,
+html[data-theme="yuyue"] .slist,
+html[data-theme="yuyue"] .stack > .card {
+  background: rgba(255, 255, 255, .72) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, .8) !important;
+  box-shadow:
+    0 4px 12px rgba(255, 140, 90, .08),
+    0 12px 32px rgba(167, 139, 250, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .9) !important;
+}
+
+/* 渐变按钮 */
+html[data-theme="yuyue"] .save-btn,
+html[data-theme="yuyue"] .btn-primary,
+html[data-theme="yuyue"] .pc-prob-btn {
+  background: linear-gradient(135deg, #ff8c5a 0%, #ff6b9d 50%, #a78bfa 100%) !important;
+  background-size: 200% 200% !important;
+  animation: yuyue-gradient 4s ease infinite;
+  box-shadow:
+    0 4px 15px rgba(255, 140, 90, .35),
+    0 8px 25px rgba(167, 139, 250, .25) !important;
+  transition: transform .15s ease, box-shadow .15s ease !important;
+}
+html[data-theme="yuyue"] .save-btn:active,
+html[data-theme="yuyue"] .btn-primary:active,
+html[data-theme="yuyue"] .pc-prob-btn:active {
+  transform: scale(.96) !important;
+  box-shadow: 0 2px 8px rgba(255, 140, 90, .3) !important;
+}
+
+@keyframes yuyue-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 分段控件 */
+html[data-theme="yuyue"] .seg {
+  background: rgba(255, 255, 255, .6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 140, 90, .15) !important;
+}
+html[data-theme="yuyue"] .seg button.on {
+  background: linear-gradient(135deg, #ff8c5a, #a78bfa) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(255, 140, 90, .3) !important;
+}
+
+/* 底部导航 */
+html[data-theme="yuyue"] .tabbar {
+  background: rgba(255, 255, 255, .8) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(255, 140, 90, .12) !important;
+}
+html[data-theme="yuyue"] .tab.on .tic {
+  background: linear-gradient(135deg, #ff8c5a, #a78bfa) !important;
+  box-shadow: 0 4px 12px rgba(255, 140, 90, .35) !important;
+}
+
+/* 月历格子 */
+html[data-theme="yuyue"] .cal-grid {
+  background: rgba(255, 255, 255, .5) !important;
+  border-radius: 20px;
+  padding: 8px;
+}
+html[data-theme="yuyue"] .cal-cell {
+  border-radius: 14px !important;
+  transition: all .2s ease !important;
+}
+html[data-theme="yuyue"] .cal-cell.today .dn {
+  background: linear-gradient(135deg, #ff8c5a, #ff6b9d) !important;
+  box-shadow: 0 3px 10px rgba(255, 140, 90, .4) !important;
+}
+html[data-theme="yuyue"] .cal-cell.period {
+  background: linear-gradient(135deg, rgba(255, 107, 157, .25), rgba(255, 140, 90, .2)) !important;
+}
+html[data-theme="yuyue"] .cal-cell.fertile {
+  background: linear-gradient(135deg, rgba(255, 200, 100, .3), rgba(255, 160, 80, .25)) !important;
+}
+html[data-theme="yuyue"] .cal-cell.ovulation {
+  background: linear-gradient(135deg, rgba(255, 140, 90, .4), rgba(255, 107, 157, .35)) !important;
+}
+
+/* 弹窗 */
+html[data-theme="yuyue"] .sheet,
+html[data-theme="yuyue"] #sheet {
+  background: rgba(255, 250, 245, .95) !important;
+  backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+}
+html[data-theme="yuyue"] .pg {
+  background: linear-gradient(180deg, #fef6ee 0%, #faf0ff 100%) !important;
+}
+
+/* 标题文字渐变 */
+html[data-theme="yuyue"] .brand-date,
+html[data-theme="yuyue"] .td-date b {
+  background: linear-gradient(135deg, #ff8c5a, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 输入框 */
+html[data-theme="yuyue"] input,
+html[data-theme="yuyue"] textarea,
+html[data-theme="yuyue"] select {
+  background: rgba(255, 255, 255, .7) !important;
+  border: 1px solid rgba(255, 140, 90, .2) !important;
+  backdrop-filter: blur(10px);
+}
+html[data-theme="yuyue"] input:focus,
+html[data-theme="yuyue"] textarea:focus {
+  border-color: #ff8c5a !important;
+  box-shadow: 0 0 0 3px rgba(255, 140, 90, .15) !important;
+}
+
+/* 开关 */
+html[data-theme="yuyue"] .switch.on {
+  background: linear-gradient(135deg, #ff8c5a, #a78bfa) !important;
+}
+
+/* 纪念日卡片顶部色条 */
+html[data-theme="yuyue"] .card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ff8c5a, #a78bfa);
+  opacity: 0;
+  transition: opacity .2s;
+  border-radius: 20px 20px 0 0;
+}
+html[data-theme="yuyue"] .card:hover::before {
+  opacity: 1;
+}
+
+/* 首页小贴士卡片特殊样式 */
+html[data-theme="yuyue"] .hm.hc.tip {
+  background: linear-gradient(135deg, rgba(255, 240, 220, .9), rgba(240, 230, 255, .9)) !important;
+  border: 1px solid rgba(255, 140, 90, .2) !important;
+}
+
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]):not([data-theme="yuyue"]) {
     --bg: #0d0e12;
