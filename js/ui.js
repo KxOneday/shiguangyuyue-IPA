@@ -996,15 +996,19 @@
 
   function openTheme() {
     const pref = S().getPrefs().theme || 'auto';
+    const custom = getCustomTheme();
     const sheetEl = openSheet(
       '<div class="sh"><div class="t">外观与主题</div><button class="x" data-close="1">' + icon('close') + '</button></div>' +
       '<div class="stack"><div class="seg" id="themeSeg">' +
       '<button class="' + (pref === 'light' ? 'on' : '') + '" data-t="light">浅色</button>' +
       '<button class="' + (pref === 'dark' ? 'on' : '') + '" data-t="dark">深色</button>' +
-      '<button class="' + (pref === 'yuyue' ? 'on' : '') + '" data-t="yuyue">屿月</button>' +
-      '<button class="' + (pref === 'dora' ? 'on' : '') + '" data-t="dora">哆啦</button>' +
       '<button class="' + (pref === 'auto' ? 'on' : '') + '" data-t="auto">跟随系统</button>' +
-      '</div></div>'
+      '</div>' +
+      (custom ? '<div class="slist"><div class="si" data-act="customtheme"><span class="ic">🎨</span><span class="cn">当前主题：' + esc(custom.name || '自定义') + '</span><span class="chev">›</span></div>' +
+      '<div class="si" data-act="removetheme"><span class="ic">🗑️</span><span class="cn">移除自定义主题</span><span class="chev">›</span></div></div>' : '') +
+      '<div class="slist"><div class="si" data-act="importtheme"><span class="ic">📥</span><span class="cn">导入主题文件</span><span class="chev">›</span></div></div>' +
+      '<input type="file" id="themeFileInput" accept=".json" style="display:none" />' +
+      '</div>'
     );
     const seg = sheetEl.querySelector('#themeSeg');
     seg.addEventListener('click', (e) => {
@@ -1014,11 +1018,99 @@
       seg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       toast('已切换主题');
     });
+    sheetEl.querySelectorAll('.si').forEach((b) => {
+      b.onclick = () => {
+        const a = b.dataset.act;
+        if (a === 'importtheme') {
+          sheetEl.querySelector('#themeFileInput').click();
+        } else if (a === 'removetheme') {
+          removeCustomTheme();
+          closeSheet();
+          toast('已移除自定义主题');
+        } else if (a === 'customtheme') {
+          toast('当前主题：' + (custom.name || '自定义'));
+        }
+      };
+    });
+    sheetEl.querySelector('#themeFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const theme = JSON.parse(ev.target.result);
+          applyCustomTheme(theme);
+          closeSheet();
+          toast('主题导入成功：' + (theme.name || '自定义'));
+        } catch (err) {
+          toast('主题文件格式错误', 'err');
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  function getCustomTheme() {
+    try {
+      const t = localStorage.getItem('dm_custom_theme');
+      return t ? JSON.parse(t) : null;
+    } catch (e) { return null; }
+  }
+
+  function applyCustomTheme(theme) {
+    try {
+      localStorage.setItem('dm_custom_theme', JSON.stringify(theme));
+    } catch (e) { /* 忽略 */ }
+    S().setPrefs({ theme: 'custom' });
+    applyTheme();
+  }
+
+  function removeCustomTheme() {
+    try { localStorage.removeItem('dm_custom_theme'); } catch (e) { /* 忽略 */ }
+    try {
+      const style = document.getElementById('custom-theme-style');
+      if (style) style.remove();
+    } catch (e) { /* 忽略 */ }
+    S().setPrefs({ theme: 'auto' });
+    applyTheme();
   }
 
   function applyTheme() {
     const t = S().getPrefs().theme || 'auto';
+    // 移除旧的自定义主题样式
+    try {
+      const old = document.getElementById('custom-theme-style');
+      if (old) old.remove();
+    } catch (e) { /* 忽略 */ }
     document.documentElement.setAttribute('data-theme', t);
+    if (t === 'custom') {
+      const theme = getCustomTheme();
+      if (theme) {
+        // 应用 CSS 变量
+        const root = document.documentElement;
+        if (theme.vars) {
+          for (const k in theme.vars) {
+            root.style.setProperty(k, theme.vars[k]);
+          }
+        }
+        // 应用背景图
+        if (theme.bgImage) {
+          document.body.style.background = (theme.bgOverlay || '') + ', url(' + theme.bgImage + ') center top / cover no-repeat';
+          document.body.style.backgroundAttachment = 'fixed';
+        }
+        // 注入额外 CSS
+        if (theme.extraCss) {
+          const style = document.createElement('style');
+          style.id = 'custom-theme-style';
+          style.textContent = theme.extraCss;
+          document.head.appendChild(style);
+        }
+      }
+    } else {
+      // 清除自定义背景
+      document.body.style.background = '';
+      document.body.style.backgroundAttachment = '';
+    }
   }
 
   function openBackup() {
