@@ -38,7 +38,12 @@ jobs:
           grep -n 'app_name' android/app/src/main/res/values/strings.xml
 
       - name: 应用安卓应用图标（仓库内预生成的 android-res 覆盖模板图标）
-        run: cp -r android-res/. android/app/src/main/res/
+        run: |
+          if [ -d android-res ]; then
+            cp -r android-res/. android/app/src/main/res/
+          else
+            echo "android-res not found, using default icon"
+          fi
 
       - name: 编译 Debug APK
         run: cd android && ./gradlew assembleDebug
