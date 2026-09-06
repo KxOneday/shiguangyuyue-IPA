@@ -1073,7 +1073,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .tab.on .tl { color: var(--accent); font-weight: 800; }
 /* 区块标题活泼化 */
 .hm-sec-t { color: var(--accent); }
-.todayline .td-lunar, .pday-lunar { color: var(--accent2); }
+.todayline .td-lunar { color: var(--accent2); }
 .hc-big, .pc-title, .cal-title { color: var(--accent); }
 /* 主要强调按钮统一渐变 */
 .save-btn, .btn, .cat-ok, .cm-eok { background: linear-gradient(135deg, var(--accent2), var(--accent)); }
