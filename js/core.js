@@ -152,30 +152,6 @@
     const info = cycleLenInfo(cycle);
     return addDays(parseYMD(cycle.lastStart), info.L - 1);
   }
-  /** 怀孕概率估算（0-100，仅供参考）
-   *  数据参考：Wilcox et al. NEJM 1995（单次同房受孕概率临床研究）
-   *  + ACOG 委员会意见：排卵前 1 天受孕概率最高，排卵日次之
-   *  精子存活 3-5 天，卵子存活 12-24 小时 */
-  function probForDay(cycle, marks, date) {
-    const ds = ymd(date);
-    if (marks && marks[ds] && (marks[ds].f || 0) > 0) return 0;
-    if (!cycle || !cycle.lastStart) return 0;
-    const start = parseYMD(cycle.lastStart);
-    if (dayDiff(date, start) < 0) return 0;
-    if (periodWindowAt(cycle, date)) return 0;
-    const ov = ovulationNear(cycle, date);
-    const dd = dayDiff(date, ov);
-    if (dd === -1) return 30;   // 排卵前1天（临床最高）
-    if (dd === 0) return 26;    // 排卵日
-    if (dd === -2) return 24;   // 排卵前2天
-    if (dd === -3) return 16;   // 排卵前3天
-    if (dd === -4) return 10;   // 排卵前4天
-    if (dd === -5) return 5;    // 排卵前5天（精子存活上限）
-    if (dd === 1) return 5;     // 排卵后1天（卵子仍可能存活）
-    if (dd === 2) return 2;
-    if (dd === 3) return 1;
-    return 0;
-  }
 
   /* ---------- 事件 → 目标日期解析 ---------- */
 
@@ -354,7 +330,7 @@
   window.DM.core = {
     MS_DAY, dateOf, parseYMD, ymd, todayMid, dayDiff, addDays,
     isLeapYear, daysInMonth, clampValid, WEEK_CN, fmtCN, fmtCNYMD, diffYMD,
-    cycleLenInfo, periodDayInfo, periodWindowAt, ovulationNear, dayKindOf, nextCycleStart, predictedPeriodEnd, probForDay,
+    cycleLenInfo, periodDayInfo, periodWindowAt, ovulationNear, dayKindOf, nextCycleStart, predictedPeriodEnd,
     lunarDateInYear, fixedLunarSolar, datesInYear, nextOnOrAfter, lastOnOrBefore,
     stateOf, todayLine
   };
