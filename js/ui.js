@@ -1400,7 +1400,7 @@
     const cycle = S().getCycle();
     const cycles = S().getCycles();
     const eff = effectiveCycle(cycle, cycles);
-    const aiProbs = getAiProbs();
+    const aiProbs = getAiProbs(eff, cycle);
     const dim = C().daysInMonth(y, m);
     const firstDow = new Date(y, m - 1, 1).getDay();
     const lead = (firstDow + 6) % 7;
@@ -1525,7 +1525,7 @@
     const kLabel = PC_NAMES[predKind] || '—';
     const actualText = mk.f > 0 ? '经期量：' + ['', '少', '中', '多'][mk.f] : '';
     const localProb = C().probForDay(eff, marks, sel);
-    const aiProbs = getAiProbs();
+    const aiProbs = getAiProbs(eff, cycle);
     const todayMid = C().todayMid();
     const selDiff = C().dayDiff(sel, todayMid);
     const inWindow = selDiff >= 0 && selDiff <= 6;
