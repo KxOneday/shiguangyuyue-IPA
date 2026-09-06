@@ -1150,12 +1150,13 @@
     const marks = S().getMarks();
     const todayKind = C().dayKindOf(eff, marks, today);
     const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[todayKind] || '未知';
-    const prompt = '你是专业的女性健康顾问。根据以下数据预测未来7天（含今天）每天同房的怀孕概率（0-100的整数百分比）：\n' +
+    const prompt = '你是专业的女性健康顾问。请根据女性生理周期医学知识，预测未来7天（含今天）每天同房的怀孕概率（0-100的整数百分比）。\n' +
+      '已知信息：\n' +
       '今天：' + C().fmtCN(today) + '，处于' + kindName + '\n' +
       '周期长度：' + (eff.cycleLen || 28) + '天，经期长度：' + (eff.periodLen || 5) + '天\n' +
       (cycle.lastStart ? '上次经期开始：' + C().fmtCN(C().parseYMD(cycle.lastStart)) + '\n' : '') +
       '需要预测的日期：' + dates.join('、') + '\n\n' +
-      '参考：排卵前1天概率最高(约30%)，排卵日约26%，排卵前2天约24%，前3天约16%，前4天约10%，前5天约5%，排卵后1天约5%，其他日期接近0。\n' +
+      '医学常识：排卵日及前后1-2天怀孕概率最高，离排卵日越远概率越低，经期和安全期概率很低。请结合周期数据自行推算排卵日，给出合理的概率值，不要全部相同。\n' +
       '请只返回JSON，key为日期(YYYY-MM-DD)，value为整数百分比，不要其他文字：\n' +
       '{"' + dates[0] + '":5,"' + dates[1] + '":10,...}';
     return callMiMo(prompt, 300).then(text => {
@@ -1424,10 +1425,7 @@
       const isSel = C().ymd(sel) === ds;
       const inWindow = inPredictionWindow(ds);
       let dayProb = 0;
-      if (inWindow) {
-        if (aiProbs && aiProbs[ds] != null) dayProb = aiProbs[ds];
-        else dayProb = C().probForDay(eff, marks, dt);
-      }
+      if (inWindow && aiProbs && aiProbs[ds] != null) dayProb = aiProbs[ds];
       let ln = '';
       try { const lt = lu.solarToLunar(y, m, day); if (lt) ln = lt.lDay === 1 ? '初一' : (lt.lDay === 15 ? '十五' : ''); } catch (e) { /* 忽略 */ }
       cells += '<div class="pc-cell ' + kind + (actual ? ' actual' : '') + (isToday ? ' today' : '') + (isSel ? ' sel' : '') + '" data-d="' + ds + '">' +
@@ -1524,15 +1522,12 @@
     if (predKind === 'period' && mk.f <= 0 && !cycleInRecords(cycles, sel) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, sel)) predKind = 'normal';
     const kLabel = PC_NAMES[predKind] || '—';
     const actualText = mk.f > 0 ? '经期量：' + ['', '少', '中', '多'][mk.f] : '';
-    const localProb = C().probForDay(eff, marks, sel);
     const aiProbs = getAiProbs(eff, cycle);
     const todayMid = C().todayMid();
     const selDiff = C().dayDiff(sel, todayMid);
     const inWindow = selDiff >= 0 && selDiff <= 6;
     let prob = 0;
-    if (inWindow) {
-      prob = (aiProbs && aiProbs[ds] != null) ? aiProbs[ds] : localProb;
-    }
+    if (inWindow && aiProbs && aiProbs[ds] != null) prob = aiProbs[ds];
     const run = actualRunFor(marks, sel);
     const activeCur = !!(cycle.lastStart && !cycles[cycle.lastStart]);
     const runEndMarked = !!(run && cycles[run.start]);
@@ -1637,7 +1632,7 @@
         toast(existed ? '已更新本周期结束日（选错可重选）' : '已记录本周期结束（单周期记录）');
       }
     }
-    else if (d.setstart) { S().setCycle({ lastStart: ds }); S().trimBeforeStart(ds); }
+    else if (d.setstart) { S().setCycle({ lastStart: ds }); }
     else if (d.clearstart) {
       S().setCycle({ lastStart: null });
       S().delCycleRecord(ds);
