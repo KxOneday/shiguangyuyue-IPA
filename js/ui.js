@@ -1001,6 +1001,7 @@
       '<div class="stack"><div class="seg" id="themeSeg">' +
       '<button class="' + (pref === 'light' ? 'on' : '') + '" data-t="light">浅色</button>' +
       '<button class="' + (pref === 'dark' ? 'on' : '') + '" data-t="dark">深色</button>' +
+      '<button class="' + (pref === 'yuyue' ? 'on' : '') + '" data-t="yuyue">屿月</button>' +
       '<button class="' + (pref === 'auto' ? 'on' : '') + '" data-t="auto">跟随系统</button>' +
       '</div></div>'
     );
