@@ -54,8 +54,33 @@ html[data-theme="dark"] {
   color-scheme: dark;
 }
 
+/* 时光屿月主题：温暖黄昏 × 静谧月光 */
+html[data-theme="yuyue"] {
+  --bg: #faf5ef;
+  --bg-tint: #fff9f2;
+  --card: #ffffff;
+  --card2: #f7f0e6;
+  --elev: #ffffff;
+  --text: #3d3229;
+  --text2: #8a7a6a;
+  --text3: #b8a898;
+  --line: rgba(61, 50, 41, .07);
+  --line2: rgba(61, 50, 41, .12);
+  --accent: #ff8c5a;
+  --accent-soft: rgba(255, 140, 90, .15);
+  --accent2: #a78bfa;
+  --danger: #e85d5d;
+  --ok: #5cb87a;
+  --shadow-card: 0 1px 2px rgba(61, 50, 41, .04), 0 10px 28px rgba(61, 50, 41, .08);
+  --shadow-float: 0 6px 20px rgba(61, 50, 41, .14);
+  --ambient1: rgba(255, 140, 90, .18);
+  --ambient2: rgba(167, 139, 250, .12);
+  --hairline: rgba(61, 50, 41, .06);
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) {
+  html:not([data-theme="light"]):not([data-theme="yuyue"]) {
     --bg: #0d0e12;
     --bg-tint: #101218;
     --card: #171a21;
