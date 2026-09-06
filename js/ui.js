@@ -1642,9 +1642,15 @@
       }
     }
     else if (d.clearstart) {
-      S().setCycle({ lastStart: null });
+      // 取消当前开始：恢复到最近一个已记录周期的开始日，推算结果随之恢复
+      const cycRecs = S().getCycles();
+      let prevStart = null;
+      for (const k of Object.keys(cycRecs)) {
+        if (k !== ds && (!prevStart || k > prevStart)) prevStart = k;
+      }
+      S().setCycle({ lastStart: prevStart });
       S().delCycleRecord(ds);
-      toast('已取消本次开始');
+      toast(prevStart ? '已取消，恢复到上一周期推算' : '已取消本次开始');
     }
     else if (d.clearend) {
       const cycRecs = S().getCycles();
