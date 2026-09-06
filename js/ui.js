@@ -1101,6 +1101,8 @@
     const sig = keys.map(k => k + ':' + (cyc[k] || '')).join(',');
     return [cycle.lastStart || '', eff.cycleLen || 28, eff.periodLen || 5, keys.length, sig].join('|');
   }
+  /* AI 缓存版本号：升级后自动失效旧缓存 */
+  const AI_CACHE_VER = 'v2';
   /* 首页小贴士：每天一条，周期更新时重新生成 */
   function fetchHomeTip(phase, eff, cycle) {
     const el = document.getElementById('homeTipText');
@@ -1109,7 +1111,7 @@
     const ch = cycleHash(eff, cycle);
     try {
       const cached = JSON.parse(localStorage.getItem('mimo_home_tip') || 'null');
-      if (cached && cached.date === todayStr && cached.hash === ch && cached.text) { el.textContent = cached.text; return; }
+      if (cached && cached.ver === AI_CACHE_VER && cached.date === todayStr && cached.hash === ch && cached.text) { el.textContent = cached.text; return; }
     } catch (e) { /* 忽略 */ }
     el.textContent = '男友思考中💭';
     const phaseName = { none: '未设置周期', period: '经期', ovulation: '排卵日', fertile: '易孕期', safe: '安全期' }[phase] || '';
@@ -1117,22 +1119,23 @@
     callMiMo(prompt, 800).then(text => {
       if (text) {
         const t = text.trim();
-        el.textContent = t;
-        try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, hash: ch, text: t })); } catch (e) { /* 忽略 */ }
+        if (t) {
+          el.textContent = t;
+          try { localStorage.setItem('mimo_home_tip', JSON.stringify({ ver: AI_CACHE_VER, date: todayStr, hash: ch, text: t })); } catch (e) { /* 忽略 */ }
+        } else {
+          el.textContent = '今天也要好好照顾自己哦～';
+        }
       } else {
-        const fallback = '今天也要好好照顾自己哦～';
-        el.textContent = fallback;
-        try { localStorage.setItem('mimo_home_tip', JSON.stringify({ date: todayStr, hash: ch, text: fallback })); } catch (e) { /* 忽略 */ }
+        el.textContent = '今天也要好好照顾自己哦～';
       }
     });
   }
-  /* AI 怀孕概率预测：每天预测一次，缓存今天+未来6天（共7天），周期更新时重新预测 */
   function getAiProbs(eff, cycle) {
     const todayStr = C().ymd(C().todayMid());
     const ch = cycleHash(eff, cycle);
     try {
       const cached = JSON.parse(localStorage.getItem('mimo_probs') || 'null');
-      if (cached && cached.date === todayStr && cached.hash === ch && cached.probs) return cached.probs;
+      if (cached && cached.ver === AI_CACHE_VER && cached.date === todayStr && cached.hash === ch && cached.probs && Object.keys(cached.probs).length > 0) return cached.probs;
     } catch (e) { /* 忽略 */ }
     return null;
   }
@@ -1158,10 +1161,7 @@
       '请只返回JSON，key为日期(YYYY-MM-DD)，value为整数百分比，不要其他文字：\n' +
       '{"' + dates[0] + '":5,"' + dates[1] + '":10,...}';
     return callMiMo(prompt, 800).then(text => {
-      if (!text) {
-        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: {} })); } catch (e) { /* 忽略 */ }
-        return {};
-      }
+      if (!text) return {};
       try {
         const jsonStr = text.replace(/```json|```/g, '').trim();
         const probs = JSON.parse(jsonStr);
@@ -1170,12 +1170,11 @@
           const v = parseInt(probs[ds], 10);
           result[ds] = isNaN(v) ? 0 : Math.max(0, Math.min(100, v));
         }
-        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: result })); } catch (e) { /* 忽略 */ }
+        if (Object.keys(result).length > 0) {
+          try { localStorage.setItem('mimo_probs', JSON.stringify({ ver: AI_CACHE_VER, date: todayStr, hash: ch, probs: result })); } catch (e) { /* 忽略 */ }
+        }
         return result;
-      } catch (e) {
-        try { localStorage.setItem('mimo_probs', JSON.stringify({ date: todayStr, hash: ch, probs: {} })); } catch (e2) { /* 忽略 */ }
-        return {};
-      }
+      } catch (e) { return {}; }
     });
   }
   function ensureAiProbs(eff, cycle, callback) {
@@ -1407,6 +1406,12 @@
     if (kind === 'fertile' || kind === 'ovulation') return 'normal';
     return kind;
   }
+  /** 日期是否在今天+未来6天的AI预测窗口内 */
+  function inPredictionWindow(ds) {
+    const today = C().todayMid();
+    const diff = C().dayDiff(C().parseYMD(ds), today);
+    return diff >= 0 && diff <= 6;
+  }
 
   function renderPeriodPage() {
     const el = $('content');
@@ -1429,6 +1434,9 @@
       const diff = C().dayDiff(C().parseYMD(ds), today);
       return diff >= 0 && diff <= 6;
     };
+    // 今天所在的周期索引（用于判断未来周期）
+    const cycleLen = eff.cycleLen || 28;
+    const todayCycleIdx = eff.lastStart ? Math.floor(C().dayDiff(today, C().parseYMD(eff.lastStart)) / cycleLen) : -1;
 
     let cells = '';
     for (let i = 0; i < lead; i++) cells += '<div class="pc-cell blank"></div>';
@@ -1442,9 +1450,10 @@
         const hk = historicalDayKind(cycles, eff, dt);
         if (hk) kind = hk;
       }
-      // 未来周期（当前周期之后）只显示经期，不显示易孕期/排卵日
-      if (eff.lastStart && C().dayDiff(dt, C().parseYMD(eff.lastStart)) >= (eff.cycleLen || 28)) {
-        if (kind === 'fertile' || kind === 'ovulation') kind = 'normal';
+      // 未来周期（今天所在周期之后）只显示经期，不显示易孕期/排卵日
+      if (eff.lastStart && todayCycleIdx >= 0) {
+        const dtIdx = Math.floor(C().dayDiff(dt, C().parseYMD(eff.lastStart)) / cycleLen);
+        if (dtIdx > todayCycleIdx && (kind === 'fertile' || kind === 'ovulation')) kind = 'normal';
       }
       if (kind === 'period' && !recHit && !(marks[ds] && marks[ds].f > 0) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, dt)) kind = 'normal';
       const actual = (marks[ds] && marks[ds].f > 0) || recHit;
@@ -1550,9 +1559,12 @@
       const hk = historicalDayKind(cycles, eff, sel);
       if (hk) predKind = hk;
     }
-    // 未来周期只显示经期，不显示易孕期/排卵日
-    if (eff.lastStart && C().dayDiff(sel, C().parseYMD(eff.lastStart)) >= (eff.cycleLen || 28)) {
-      if (predKind === 'fertile' || predKind === 'ovulation') predKind = 'normal';
+    // 未来周期（今天所在周期之后）只显示经期，不显示易孕期/排卵日
+    if (eff.lastStart) {
+      const L = eff.cycleLen || 28;
+      const todayIdx = Math.floor(C().dayDiff(C().todayMid(), C().parseYMD(eff.lastStart)) / L);
+      const selIdx = Math.floor(C().dayDiff(sel, C().parseYMD(eff.lastStart)) / L);
+      if (selIdx > todayIdx && (predKind === 'fertile' || predKind === 'ovulation')) predKind = 'normal';
     }
     if (predKind === 'period' && mk.f <= 0 && !cycleInRecords(cycles, sel) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, sel)) predKind = 'normal';
     const kLabel = PC_NAMES[predKind] || '—';
