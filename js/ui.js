@@ -1084,7 +1084,7 @@
   const MIMO_KEY = 'sk-cwy1rgts293yogn09rmmg7zd68xocv4lf08mj58gpjal0r0c';
   function callMiMo(prompt, maxTokens) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 180秒超时
     return fetch('https://api.xiaomimimo.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + MIMO_KEY, 'Content-Type': 'application/json' },
@@ -1147,47 +1147,38 @@
     const cycles = S().getCycles();
     const cycleLen = cycle.cycleLen || 28;
     const periodLen = cycle.periodLen || 5;
-    const activeStart = getActiveStart(cycle, cycles);
-    // 计算每天的周期天数和阶段
+    // 未来7天日期
     const dates = [];
-    const dayInfos = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(today); d.setDate(d.getDate() + i);
-      const ds = C().ymd(d);
-      dates.push(ds);
-      let dayInCycle = -1, phase = '未知';
-      if (activeStart) {
-        const diff = C().dayDiff(d, C().parseYMD(activeStart));
-        if (diff >= 0) {
-          dayInCycle = (diff % cycleLen) + 1;
-          const ovDay = cycleLen - 14;
-          if (dayInCycle <= periodLen) phase = '经期';
-          else if (dayInCycle === ovDay) phase = '排卵日';
-          else if (dayInCycle >= ovDay - 5 && dayInCycle <= ovDay + 1) phase = '易孕期';
-          else phase = '安全期';
-        }
-      }
-      dayInfos.push(ds + '(第' + (dayInCycle > 0 ? dayInCycle : '?') + '天,' + phase + ')');
+      dates.push(C().ymd(d));
     }
-    // 收集近期6个月的周期记录
-    const sixMonthsAgo = C().addDays(today, -180);
-    const recentCycles = [];
-    for (const k of Object.keys(cycles)) {
-      const sd = C().parseYMD(k);
-      if (sd && C().dayDiff(sd, sixMonthsAgo) >= 0) {
-        recentCycles.push(k + '~' + (cycles[k] || '未结束'));
-      }
+    // 收集所有周期记录（按开始日期排序）
+    const allCycles = Object.keys(cycles).sort();
+    let cycleList = '';
+    if (allCycles.length > 0) {
+      cycleList = allCycles.map(k => '- ' + k + ' ~ ' + (cycles[k] || '未结束')).join('\n');
+    } else {
+      cycleList = '（无历史记录）';
     }
-    let historyInfo = '';
-    if (recentCycles.length > 0) {
-      const months = Math.min(6, recentCycles.length);
-      historyInfo = '近' + months + '个月周期：' + recentCycles.join('，') + '。';
-    }
-    const prompt = '周期' + cycleLen + '天，经期' + periodLen + '天。' + historyInfo +
-      '未来7天：' + dayInfos.join('，') +
-      '。参考概率：经期0-5%，安全期0-10%，易孕期15-30%，排卵日25-35%。' +
-      '返回0-100整数JSON：{"' + dates.join('":0,"') + '":0}';
-    return callMiMo(prompt, 4000).then(text => {
+    // 当前活动周期开始日
+    const activeStart = cycle.lastStart || '';
+    const activeInfo = activeStart ? activeStart : '无（上一周期已结束）';
+    // 构建prompt
+    const prompt = '用户生理周期记录（开始~结束）：\n' + cycleList + '\n\n' +
+      '用户设置：周期约' + cycleLen + '天，经期约' + periodLen + '天\n' +
+      '当前活动周期开始日：' + activeInfo + '\n\n' +
+      '请根据权威医学研究（Wilcox et al. NEJM 1995、ACOG 指南等）分析以下7天的怀孕概率：\n' +
+      dates.join(', ') + '\n\n' +
+      '分析要点：\n' +
+      '1. 根据用户实际周期记录推算排卵日（通常下次月经前14天）\n' +
+      '2. 易孕期为排卵日前5天至排卵日后1天\n' +
+      '3. 精子存活约3-5天，卵子存活约12-24小时\n' +
+      '4. 周期不规律时按实际记录调整\n' +
+      '5. 返回0-100的整数百分比\n\n' +
+      '只返回JSON，不要解释：\n' +
+      '{"' + dates.join('":0,"') + '":0}';
+    return callMiMo(prompt, 8000).then(text => {
       if (!text) { ui.predictingProbs = false; return {}; }
       try {
         // 用正则提取第一个JSON对象（AI可能返回额外文字）
