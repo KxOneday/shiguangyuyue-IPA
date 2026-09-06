@@ -54,7 +54,8 @@
     filter: 'all', q: '', tab: 'home', view: 'list',
     calYM: null, calSel: null, editingId: null,
     draftPhoto: null, // dataURL（新增/替换时）
-    el: {}, lastDayStr: '', swipeLockUntil: 0
+    el: {}, lastDayStr: '', swipeLockUntil: 0,
+    predictingProbs: false // AI怀孕概率预测中
   };
   const TAB_PATHS = {
     home: '<path d="M4 11.5 12 4l8 7.5"/><path d="M6.5 10.5V20h11v-9.5"/><path d="M9.8 20v-6h4.4v6"/>',
@@ -211,8 +212,6 @@
     const cats = st.cats;
     let h = chip('all', '全部', ui.filter === 'all', null, 'all');
     for (const c of cats) h += chip('c-' + c.id, c.name, ui.filter === c.id, c.color, 'cat');
-    h += chip('past', '已过去', ui.filter === 'past', null, 'past');
-    h += chip('yearly', '每年重复', ui.filter === 'yearly', null, 'yearly');
     $('chips').innerHTML = h;
   }
   function chip(key, label, on, color, kind) {
@@ -246,9 +245,7 @@
       const q = ui.q.toLowerCase();
       list = list.filter((e) => (e.title || '').toLowerCase().includes(q) || (e.note || '').toLowerCase().includes(q));
     }
-    if (ui.filter === 'past') list = list.filter((e) => { const s = C().stateOf(e); return s.phase === 'past'; });
-    else if (ui.filter === 'yearly') list = list.filter((e) => !!e.repeat || e.cal === 'lunar');
-    else if (ui.filter !== 'all') list = list.filter((e) => e.cat === ui.filter);
+    if (ui.filter !== 'all') list = list.filter((e) => e.cat === ui.filter);
     return S().sortEvents(list);
   }
 
@@ -1086,29 +1083,33 @@
   /* ---------- 小米 MiMo AI ---------- */
   const MIMO_KEY = 'sk-cwy1rgts293yogn09rmmg7zd68xocv4lf08mj58gpjal0r0c';
   function callMiMo(prompt, maxTokens) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒超时
     return fetch('https://api.xiaomimimo.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + MIMO_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 800 })
+      body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens || 800 }),
+      signal: controller.signal
     }).then(r => r.json()).then(data => {
+      clearTimeout(timeoutId);
       return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    }).catch(() => null);
+    }).catch(() => { clearTimeout(timeoutId); return null; });
   }
   /* 周期状态 hash：周期更新时缓存失效 */
-  function cycleHash(eff, cycle, cycles) {
-    const cyc = cycles || S().getCycles();
-    const keys = Object.keys(cyc).sort();
-    const sig = keys.map(k => k + ':' + (cyc[k] || '')).join(',');
-    return [cycle.lastStart || '', eff.cycleLen || 28, eff.periodLen || 5, keys.length, sig].join('|');
+  function cycleHash(cycle) {
+    const cycles = S().getCycles();
+    const keys = Object.keys(cycles).sort();
+    const sig = keys.map(k => k + ':' + (cycles[k] || '')).join(',');
+    return [cycle.lastStart || '', cycle.cycleLen || 28, cycle.periodLen || 5, keys.length, sig].join('|');
   }
   /* AI 缓存版本号：升级后自动失效旧缓存 */
-  const AI_CACHE_VER = 'v2';
+  const AI_CACHE_VER = 'v3';
   /* 首页小贴士：每天一条，周期更新时重新生成 */
-  function fetchHomeTip(phase, eff, cycle) {
+  function fetchHomeTip(phase, cycle) {
     const el = document.getElementById('homeTipText');
     if (!el) return;
     const todayStr = C().ymd(C().todayMid());
-    const ch = cycleHash(eff, cycle);
+    const ch = cycleHash(cycle);
     try {
       const cached = JSON.parse(localStorage.getItem('mimo_home_tip') || 'null');
       if (cached && cached.ver === AI_CACHE_VER && cached.date === todayStr && cached.hash === ch && cached.text) { el.textContent = cached.text; return; }
@@ -1130,35 +1131,69 @@
       }
     });
   }
-  function getAiProbs(eff, cycle) {
+  function getAiProbs(cycle) {
     const todayStr = C().ymd(C().todayMid());
-    const ch = cycleHash(eff, cycle);
+    const ch = cycleHash(cycle);
     try {
       const cached = JSON.parse(localStorage.getItem('mimo_probs') || 'null');
       if (cached && cached.ver === AI_CACHE_VER && cached.date === todayStr && cached.hash === ch && cached.probs && Object.keys(cached.probs).length > 0) return cached.probs;
     } catch (e) { /* 忽略 */ }
     return null;
   }
-  function fetchAiProbs(eff, cycle) {
+  function fetchAiProbs(cycle) {
     const todayStr = C().ymd(C().todayMid());
-    const ch = cycleHash(eff, cycle);
+    const ch = cycleHash(cycle);
     const today = C().todayMid();
+    const cycles = S().getCycles();
+    const cycleLen = cycle.cycleLen || 28;
+    const periodLen = cycle.periodLen || 5;
+    const activeStart = getActiveStart(cycle, cycles);
+    // 计算每天的周期天数和阶段
     const dates = [];
+    const dayInfos = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(today); d.setDate(d.getDate() + i);
-      dates.push(C().ymd(d));
+      const ds = C().ymd(d);
+      dates.push(ds);
+      let dayInCycle = -1, phase = '未知';
+      if (activeStart) {
+        const diff = C().dayDiff(d, C().parseYMD(activeStart));
+        if (diff >= 0) {
+          dayInCycle = (diff % cycleLen) + 1;
+          const ovDay = cycleLen - 14;
+          if (dayInCycle <= periodLen) phase = '经期';
+          else if (dayInCycle === ovDay) phase = '排卵日';
+          else if (dayInCycle >= ovDay - 5 && dayInCycle <= ovDay + 1) phase = '易孕期';
+          else phase = '安全期';
+        }
+      }
+      dayInfos.push(ds + '(第' + (dayInCycle > 0 ? dayInCycle : '?') + '天,' + phase + ')');
     }
-    const marks = S().getMarks();
-    const todayKind = C().dayKindOf(eff, marks, today);
-    const kindName = { period: '经期', fertile: '易孕期', ovulation: '排卵日', normal: '安全期' }[todayKind] || '未知';
-    const prompt = '今天' + C().fmtCN(today) + '处于' + kindName + '，周期' + (eff.cycleLen || 28) + '天经期' + (eff.periodLen || 5) + '天' +
-      (cycle.lastStart ? '，上次开始' + C().fmtCN(C().parseYMD(cycle.lastStart)) : '') +
-      '。预测未来7天怀孕概率，直接返回JSON，不要解释：{"' + dates.join('":0,"') + '":0}';
-    return callMiMo(prompt, 500).then(text => {
-      if (!text) return {};
+    // 收集近期6个月的周期记录
+    const sixMonthsAgo = C().addDays(today, -180);
+    const recentCycles = [];
+    for (const k of Object.keys(cycles)) {
+      const sd = C().parseYMD(k);
+      if (sd && C().dayDiff(sd, sixMonthsAgo) >= 0) {
+        recentCycles.push(k + '~' + (cycles[k] || '未结束'));
+      }
+    }
+    let historyInfo = '';
+    if (recentCycles.length > 0) {
+      const months = Math.min(6, recentCycles.length);
+      historyInfo = '近' + months + '个月周期：' + recentCycles.join('，') + '。';
+    }
+    const prompt = '周期' + cycleLen + '天，经期' + periodLen + '天。' + historyInfo +
+      '未来7天：' + dayInfos.join('，') +
+      '。参考概率：经期0-5%，安全期0-10%，易孕期15-30%，排卵日25-35%。' +
+      '返回0-100整数JSON：{"' + dates.join('":0,"') + '":0}';
+    return callMiMo(prompt, 4000).then(text => {
+      if (!text) { ui.predictingProbs = false; return {}; }
       try {
-        const jsonStr = text.replace(/```json|```/g, '').trim();
-        const probs = JSON.parse(jsonStr);
+        // 用正则提取第一个JSON对象（AI可能返回额外文字）
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) { ui.predictingProbs = false; return {}; }
+        const probs = JSON.parse(jsonMatch[0]);
         const result = {};
         for (const ds of dates) {
           let v = parseFloat(probs[ds]);
@@ -1170,15 +1205,42 @@
           try { localStorage.setItem('mimo_probs', JSON.stringify({ ver: AI_CACHE_VER, date: todayStr, hash: ch, probs: result })); } catch (e) { /* 忽略 */ }
         }
         return result;
-      } catch (e) { return {}; }
+      } catch (e) { ui.predictingProbs = false; return {}; }
     });
   }
-  function ensureAiProbs(eff, cycle, callback) {
-    const cached = getAiProbs(eff, cycle);
+  function ensureAiProbs(cycle, callback) {
+    const cached = getAiProbs(cycle);
     if (cached) { if (callback) callback(cached); return; }
-    fetchAiProbs(eff, cycle).then(probs => {
+    fetchAiProbs(cycle).then(probs => {
       if (callback) callback(probs || {});
+    }).catch(() => {
+      ui.predictingProbs = false;
+      if (callback) callback({});
     });
+  }
+  /** 清除 AI 缓存（周期变更时调用） */
+  function clearAiCache() {
+    try { localStorage.removeItem('mimo_probs'); } catch (e) { /* 忽略 */ }
+    try { localStorage.removeItem('mimo_home_tip'); } catch (e) { /* 忽略 */ }
+  }
+  /** 每天预测次数限制（3次） */
+  const PROBS_DAILY_LIMIT = 3;
+  function getProbCount() {
+    try {
+      const c = JSON.parse(localStorage.getItem('mimo_prob_count') || 'null');
+      const todayStr = C().ymd(C().todayMid());
+      if (c && c.date === todayStr) return c.count || 0;
+    } catch (e) { /* 忽略 */ }
+    return 0;
+  }
+  function incProbCount() {
+    const todayStr = C().ymd(C().todayMid());
+    const count = getProbCount() + 1;
+    try { localStorage.setItem('mimo_prob_count', JSON.stringify({ date: todayStr, count })); } catch (e) { /* 忽略 */ }
+    return count;
+  }
+  function resetProbCount() {
+    try { localStorage.removeItem('mimo_prob_count'); } catch (e) { /* 忽略 */ }
   }
 
   /* =========================================================
@@ -1347,15 +1409,91 @@
     return (y === t.getFullYear() && m === t.getMonth() + 1) ? t : C().dateOf(y, m, 1);
   }
   function markObj(mark) { return { f: mark ? (mark.f || 0) : 0, p: mark ? (mark.p || 0) : 0, mood: mark ? (mark.mood || '') : '', c: mark ? (mark.c || '') : '', e: mark ? (mark.e || 0) : 0, s: mark && Array.isArray(mark.s) ? mark.s.slice() : [] }; }
-  function periodSummary(cycle, today) {
-    if (!cycle.lastStart) return null;
-    const pi = C().periodDayInfo(cycle, today);
-    const ns = C().nextCycleStart(cycle, today);
-    const diff = ns ? C().dayDiff(ns, today) : null;
-    const pe = C().predictedPeriodEnd(cycle);
-    const info = C().cycleLenInfo(cycle);
-    return { day: pi ? pi.day + 1 : null, next: ns, days: diff, predEnd: pe, L: info.L, inWindow: !!C().periodWindowAt(cycle, today) };
+
+  /* =========================================================
+   * 全新周期推算算法
+   * ========================================================= */
+
+  /** 获取当前活动周期的开始日：有 lastStart 用 lastStart，否则用最近已记录周期的开始日（不跳转到下一期） */
+  function getActiveStart(cycle, cycles) {
+    if (cycle.lastStart) return cycle.lastStart;
+    let latest = null;
+    for (const k of Object.keys(cycles || {})) {
+      if (!latest || k > latest) latest = k;
+    }
+    return latest;
   }
+
+  /** 获取某天在当前活动周期内的状态（仅当前周期，不含历史和未来） */
+  function statusInActiveCycle(date, activeStart, cycleLen, periodLen) {
+    if (!activeStart) return null;
+    const diff = C().dayDiff(date, C().parseYMD(activeStart));
+    if (diff < 0 || diff >= cycleLen) return null;
+    if (diff < periodLen) return 'period';
+    const ov = cycleLen - 14;
+    if (diff === ov) return 'ovulation';
+    if (diff >= ov - 5 && diff <= ov + 1) return 'fertile';
+    return 'safe';
+  }
+
+  /** 获取历史日期的状态（只返回 period 或 safe，不显示易孕期/排卵日） */
+  function statusInHistory(date, cycles, periodLen) {
+    let bestStart = null;
+    for (const k of Object.keys(cycles || {})) {
+      const sd = C().parseYMD(k);
+      if (sd && C().dayDiff(date, sd) >= 0) {
+        if (!bestStart || C().dayDiff(sd, C().parseYMD(bestStart)) > 0) bestStart = k;
+      }
+    }
+    if (!bestStart) return null;
+    const diff = C().dayDiff(date, C().parseYMD(bestStart));
+    const endStr = cycles[bestStart];
+    const endDiff = endStr ? C().dayDiff(C().parseYMD(endStr), C().parseYMD(bestStart)) : (periodLen - 1);
+    if (diff >= 0 && diff <= endDiff) return 'period';
+    return 'safe';
+  }
+
+  /** 综合判断某天的显示状态 */
+  function dayStatus(date, cycle, cycles) {
+    const cycleLen = cycle.cycleLen || 28;
+    const periodLen = cycle.periodLen || 5;
+    // 1. 已记录周期的经期
+    if (cycleInRecords(cycles, date)) return 'period';
+    // 2. 当前活动周期的状态（易孕期只显示活动周期内的，不自动跳到下一期）
+    const activeStart = getActiveStart(cycle, cycles);
+    const s = statusInActiveCycle(date, activeStart, cycleLen, periodLen);
+    if (s) return s;
+    // 3. 历史日期
+    if (activeStart && C().dayDiff(date, C().parseYMD(activeStart)) < 0) {
+      const h = statusInHistory(date, cycles, periodLen);
+      if (h) return h;
+    }
+    // 4. 活动周期之后的未来日期：只显示推算经期，不显示易孕期/排卵日
+    if (activeStart) {
+      const diff = C().dayDiff(date, C().parseYMD(activeStart));
+      if (diff >= cycleLen) {
+        const k = Math.floor(diff / cycleLen);
+        const cycleDay = diff - k * cycleLen;
+        if (cycleDay < periodLen) return 'period';
+        return 'safe';
+      }
+    }
+    return 'safe';
+  }
+
+  /** 顶部摘要：当前周期第几天、下次经期等 */
+  function periodSummary(cycle, cycles, today) {
+    const activeStart = getActiveStart(cycle, cycles);
+    if (!activeStart) return null;
+    const cycleLen = cycle.cycleLen || 28;
+    const periodLen = cycle.periodLen || 5;
+    const diff = C().dayDiff(today, C().parseYMD(activeStart));
+    const day = ((diff % cycleLen) + cycleLen) % cycleLen;
+    const nextStart = C().addDays(C().parseYMD(activeStart), Math.ceil((diff + 1) / cycleLen) * cycleLen);
+    const daysToNext = C().dayDiff(nextStart, today);
+    return { day: day + 1, next: nextStart, days: daysToNext, L: periodLen, inPeriod: day < periodLen };
+  }
+
   function actualRunFor(marks, date) {
     const ds = C().ymd(date);
     if (!marks[ds] || !(marks[ds].f > 0)) return null;
@@ -1374,40 +1512,6 @@
     }
     return false;
   }
-  /** 该日期若处在“预测经期窗口”内，但同一窗口对应的周期已被记录且已结束（结束日早于该日）→ 不再显示预测红色 */
-  function predictedEndedIn(cycles, effStart, len, date) {
-    if (!effStart) return false;
-    const sd = C().parseYMD(effStart);
-    if (!sd || C().dayDiff(date, sd) < 0) return false;
-    const L = Math.max(1, len || 28);
-    const ws = C().addDays(sd, Math.floor(C().dayDiff(date, sd) / L) * L);
-    const rec = (cycles || {})[C().ymd(ws)];
-    return !!(rec && C().dayDiff(date, C().parseYMD(rec)) > 0);
-  }
-  /** 推算参数：只用用户设置 + 用户选择的开始日；历史记录仅用于区间涂色，不改变推算 */
-  function effectiveCycle(cycle, cycles) {
-    return { lastStart: cycle.lastStart, lastEnd: null, cycleLen: cycle.cycleLen || 28, periodLen: cycle.periodLen || 5 };
-  }
-  /** 历史周期状态推算：对于早于当前 lastStart 的日期，找到所属历史周期并推算经期/排卵日/易孕期 */
-  function historicalDayKind(cycles, eff, date) {
-    let bestStart = null;
-    for (const k of Object.keys(cycles || {})) {
-      const sd = C().parseYMD(k);
-      if (sd && C().dayDiff(date, sd) >= 0 && (!bestStart || C().dayDiff(sd, bestStart) > 0)) bestStart = k;
-    }
-    if (!bestStart) return null;
-    const histCycle = { lastStart: bestStart, cycleLen: eff.cycleLen || 28, periodLen: eff.periodLen || 5 };
-    const kind = C().dayKindOf(histCycle, {}, date);
-    // 历史周期只显示经期，不显示易孕期/排卵日
-    if (kind === 'fertile' || kind === 'ovulation') return 'normal';
-    return kind;
-  }
-  /** 日期是否在今天+未来6天的AI预测窗口内 */
-  function inPredictionWindow(ds) {
-    const today = C().todayMid();
-    const diff = C().dayDiff(C().parseYMD(ds), today);
-    return diff >= 0 && diff <= 6;
-  }
 
   function renderPeriodPage() {
     const el = $('content');
@@ -1419,40 +1523,25 @@
     const marks = S().getMarks();
     const cycle = S().getCycle();
     const cycles = S().getCycles();
-    const eff = effectiveCycle(cycle, cycles);
-    const aiProbs = getAiProbs(eff, cycle);
+    const aiProbs = getAiProbs(cycle);
     const dim = C().daysInMonth(y, m);
     const firstDow = new Date(y, m - 1, 1).getDay();
     const lead = (firstDow + 6) % 7;
     const lu = window.DM.lunar;
-    const todayStr = C().ymd(today);
     const inPredictionWindow = (ds) => {
       const diff = C().dayDiff(C().parseYMD(ds), today);
       return diff >= 0 && diff <= 6;
     };
-    // 今天所在的周期索引（用于判断未来周期）
-    const cycleLen = eff.cycleLen || 28;
-    const todayCycleIdx = eff.lastStart ? Math.floor(C().dayDiff(today, C().parseYMD(eff.lastStart)) / cycleLen) : -1;
 
     let cells = '';
     for (let i = 0; i < lead; i++) cells += '<div class="pc-cell blank"></div>';
     for (let day = 1; day <= dim; day++) {
       const dt = C().dateOf(y, m, day);
       const ds = C().ymd(dt);
-      const recHit = cycleInRecords(cycles, dt); // 已记录周期的开始~结束整段都算经期
-      let kind = recHit ? 'period' : C().dayKindOf(eff, marks, dt);
-      // 早于当前开始日的日期：用历史周期推算（只显示经期）
-      if (kind === 'normal' && !recHit && eff.lastStart && C().dayDiff(dt, C().parseYMD(eff.lastStart)) < 0) {
-        const hk = historicalDayKind(cycles, eff, dt);
-        if (hk) kind = hk;
-      }
-      // 未来周期（今天所在周期之后）只显示经期，不显示易孕期/排卵日
-      if (eff.lastStart && todayCycleIdx >= 0) {
-        const dtIdx = Math.floor(C().dayDiff(dt, C().parseYMD(eff.lastStart)) / cycleLen);
-        if (dtIdx > todayCycleIdx && (kind === 'fertile' || kind === 'ovulation')) kind = 'normal';
-      }
-      if (kind === 'period' && !recHit && !(marks[ds] && marks[ds].f > 0) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, dt)) kind = 'normal';
-      const actual = (marks[ds] && marks[ds].f > 0) || recHit;
+      let kind = dayStatus(dt, cycle, cycles);
+      // 旧代码用 'normal' 表示安全期，新算法用 'safe'，统一一下
+      if (kind === 'safe') kind = 'normal';
+      const actual = (marks[ds] && marks[ds].f > 0) || cycleInRecords(cycles, dt);
       const isToday = C().ymd(today) === ds;
       const isSel = C().ymd(sel) === ds;
       const inWindow = inPredictionWindow(ds);
@@ -1463,22 +1552,22 @@
       cells += '<div class="pc-cell ' + kind + (actual ? ' actual' : '') + (isToday ? ' today' : '') + (isSel ? ' sel' : '') + '" data-d="' + ds + '">' +
         '<span class="dn">' + day + '</span>' +
         (ln ? '<span class="ln">' + ln + '</span>' : '<span class="ln"> </span>') +
-        (inWindow ? '<span class="prob">' + dayProb + '%</span>' : '<span class="dk"></span>') +
+        (aiProbs && inWindow ? '<span class="prob">' + dayProb + '%</span>' : '') +
         '</div>';
     }
 
     // 图例 + 概要
-    const sum = periodSummary(eff, today);
+    const sum = periodSummary(cycle, cycles, today);
     const todayRun = actualRunFor(marks, today);
     const todayEndMarked = !!(todayRun && cycles[todayRun.start]);
     const activeOriginal = !!(cycle.lastStart && !cycles[cycle.lastStart]);
     let summaryHtml;
-    if (!cycle.lastStart) {
+    if (!cycle.lastStart && Object.keys(cycles).length === 0) {
       summaryHtml = '<div class="pc-sum warn">还没有设置周期：点任意一天 →「设为本次开始」，之后会自动推算。</div>';
     } else if (sum) {
       let t;
       if (activeOriginal && !todayEndMarked) {
-        t = '本次经期已开始 · 预测约 ' + (eff.periodLen || 5) + ' 天（实际可能长几天）——请到真正结束那天点「选择结束日」';
+        t = '本次经期已开始 · 预测约 ' + (cycle.periodLen || 5) + ' 天（实际可能长几天）——请到真正结束那天点「选择结束日」';
       } else {
         t = (sum.day ? '周期第 ' + sum.day + ' 天' : '周期外') + (sum.next ? ' ｜ 下次预计 <b>' + C().fmtCN(sum.next) + '</b>' + (sum.days != null ? '（还有 ' + sum.days + ' 天）' : '') : '');
       }
@@ -1486,26 +1575,34 @@
     } else {
       summaryHtml = '';
     }
-    const legend = '<div class="pc-legend"><span class="lg per"></span>经期<span class="lg ovu"></span>排卵日<span class="lg fer"></span>易孕期<span class="lg safe"></span>安全期<span class="lg-note">易孕期底部数字=当天同房怀孕概率</span></div>';
+    let probBtn;
+    const probCount = getProbCount();
+    const remaining = PROBS_DAILY_LIMIT - probCount;
+    if (ui.predictingProbs) {
+      probBtn = '<button type="button" class="pc-prob-btn" disabled>AI预测中...</button>';
+    } else if (remaining <= 0) {
+      probBtn = '<button type="button" class="pc-prob-btn" disabled>今日次数已用完(' + PROBS_DAILY_LIMIT + '/' + PROBS_DAILY_LIMIT + ')</button>';
+    } else if (aiProbs) {
+      probBtn = '<button type="button" class="pc-prob-btn" data-act="predictprob">重新预测(剩' + remaining + '次)</button>';
+    } else {
+      probBtn = '<button type="button" class="pc-prob-btn" data-act="predictprob">怀孕概率</button>';
+    }
+    const legend = '<div class="pc-legend"><span class="lg per"></span>经期<span class="lg ovu"></span>排卵日<span class="lg fer"></span>易孕期<span class="lg safe"></span>安全期</div>';
 
     el.innerHTML =
       '<div class="pcal">' +
       '<div class="pc-head"><button type="button" class="iconbtn" data-act="prev">' + icon('left') + '</button>' +
       '<span class="pc-title">' + y + '年' + m + '月</span>' +
-      '<button type="button" class="iconbtn" data-act="today" title="回到今天">今</button>' +
       '<button type="button" class="iconbtn" data-act="next">' + icon('right') + '</button>' +
+      '<button type="button" class="iconbtn" data-act="today" title="回到今天">今</button>' +
       '<button type="button" class="iconbtn" data-act="conf" title="周期设置">' + icon('set') + '</button>' +
       '</div>' +
       '<div class="pc-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>' +
       '<div class="pc-grid" id="pcGrid">' + cells + '</div>' +
+      '<div class="pc-prob-row">' + probBtn + '</div>' +
       legend + summaryHtml +
       '</div>' +
-      renderDayPanel(sel, marks, cycle, cycles, eff);
-
-    // AI 怀孕概率预测：无缓存时触发，完成后重新渲染（仅当仍在月历页）
-    if (!aiProbs) {
-      ensureAiProbs(eff, cycle, () => { if (ui.tab === 'cal') renderPeriodPage(); });
-    }
+      renderDayPanel(sel, marks, cycle, cycles);
 
     // 事件接线
     el.querySelectorAll('[data-act]').forEach((b) => {
@@ -1515,6 +1612,21 @@
         else if (a === 'next') slideMonth(1);
         else if (a === 'today') { ui.calYM = { y: today.getFullYear(), m: today.getMonth() + 1 }; renderPeriodPage(); }
         else if (a === 'conf') { openCycleSheet(); }
+        else if (a === 'predictprob') {
+          if (getProbCount() >= PROBS_DAILY_LIMIT) { toast('今日预测次数已用完', 'err'); return; }
+          ui.predictingProbs = true;
+          b.disabled = true; b.textContent = 'AI预测中...';
+          clearAiCache();
+          ensureAiProbs(cycle, (probs) => {
+            ui.predictingProbs = false;
+            if (probs && Object.keys(probs).length > 0) {
+              incProbCount();
+            } else {
+              toast('预测失败，请稍后重试', 'err');
+            }
+            if (ui.tab === 'cal') renderPeriodPage();
+          });
+        }
       };
     });
     el.querySelectorAll('.pc-cell[data-d]').forEach((c) => {
@@ -1526,7 +1638,6 @@
     el.querySelectorAll('.pc-mood').forEach((b) => { b.onclick = () => wireDayPanel({ mood: b.dataset.m }); });
     el.querySelectorAll('.pc-symptom').forEach((b) => { b.onclick = () => wireDayPanel({ symptom: b.dataset.s }); });
     el.querySelectorAll('.pc-color').forEach((b) => { b.onclick = () => wireDayPanel({ color: b.dataset.c }); });
-    el.querySelectorAll('.pc-conf').forEach((b) => { b.onclick = () => openCycleSheet(); });
 
     // 月历网格：左右滑动切换月份
     const pcal = el.querySelector('.pcal');
@@ -1546,26 +1657,14 @@
     }
   }
 
-  function renderDayPanel(sel, marks, cycle, cycles, eff) {
+  function renderDayPanel(sel, marks, cycle, cycles) {
     const ds = C().ymd(sel);
     const mk = markObj(marks[ds]);
-    const kRaw = C().dayKindOf(eff, {}, sel);
-    let predKind = kRaw;
-    if (predKind === 'normal' && eff.lastStart && C().dayDiff(sel, C().parseYMD(eff.lastStart)) < 0) {
-      const hk = historicalDayKind(cycles, eff, sel);
-      if (hk) predKind = hk;
-    }
-    // 未来周期（今天所在周期之后）只显示经期，不显示易孕期/排卵日
-    if (eff.lastStart) {
-      const L = eff.cycleLen || 28;
-      const todayIdx = Math.floor(C().dayDiff(C().todayMid(), C().parseYMD(eff.lastStart)) / L);
-      const selIdx = Math.floor(C().dayDiff(sel, C().parseYMD(eff.lastStart)) / L);
-      if (selIdx > todayIdx && (predKind === 'fertile' || predKind === 'ovulation')) predKind = 'normal';
-    }
-    if (predKind === 'period' && mk.f <= 0 && !cycleInRecords(cycles, sel) && predictedEndedIn(cycles, eff.lastStart, eff.cycleLen || 28, sel)) predKind = 'normal';
+    let predKind = dayStatus(sel, cycle, cycles);
+    if (predKind === 'safe') predKind = 'normal';
     const kLabel = PC_NAMES[predKind] || '—';
     const actualText = mk.f > 0 ? '经期量：' + ['', '少', '中', '多'][mk.f] : '';
-    const aiProbs = getAiProbs(eff, cycle);
+    const aiProbs = getAiProbs(cycle);
     const todayMid = C().todayMid();
     const selDiff = C().dayDiff(sel, todayMid);
     const inWindow = selDiff >= 0 && selDiff <= 6;
@@ -1575,9 +1674,8 @@
     const activeCur = !!(cycle.lastStart && !cycles[cycle.lastStart]);
     const runEndMarked = !!(run && cycles[run.start]);
     const runEnd = run && cycles[run.start] ? cycles[run.start] : '';
-    const inPredicted = !!C().periodWindowAt(eff, sel);
-    const pi = C().periodDayInfo(eff, sel);
-    const showProb = inWindow;
+    const activeStart = getActiveStart(cycle, cycles);
+    const showProb = inWindow && !!aiProbs;
 
     // 未来的日期默认不可设置，只能查看预测
     if (C().dayDiff(sel, C().todayMid()) > 0) {
@@ -1601,17 +1699,22 @@
     for (const k of Object.keys(cycles)) { if (cycles[k] === ds) { endOfCycle = k; break; } }
     const isEndDay = !!endOfCycle;
     let cycLine = '';
-    if (pi && pi.day >= 0) {
-      if (mk.f > 0 || (cycle.lastStart && run)) {
-        cycLine = '本次经期第 ' + (C().dayDiff(sel, C().parseYMD(run ? run.start : cycle.lastStart)) + 1) + ' 天';
-      } else if (predKind === 'period') {
-        cycLine = '预测经期第 ' + (C().dayDiff(sel, C().parseYMD(eff.lastStart)) % (eff.cycleLen || 28) + 1) + ' 天';
+    if (activeStart) {
+      const diff = C().dayDiff(sel, C().parseYMD(activeStart));
+      const cycleLen = cycle.cycleLen || 28;
+      if (diff >= 0) {
+        const dayInCycle = diff % cycleLen;
+        if (mk.f > 0 || run) {
+          cycLine = '本次经期第 ' + (C().dayDiff(sel, C().parseYMD(run ? run.start : activeStart)) + 1) + ' 天';
+        } else if (predKind === 'period') {
+          cycLine = '预测经期第 ' + (dayInCycle + 1) + ' 天';
+        }
       }
     }
     return '<div class="pday">' +
       '<div class="pday-head"><b>' + C().fmtCN(sel) + ' ' + C().WEEK_CN[sel.getDay()] + '</b>' +
       '<span class="pday-kind ' + predKind + '">' + (mk.f > 0 ? '已记录 · 经期' : '预测：' + kLabel) + '</span></div>' +
-      (cycLine ? '<div class="pday-cycle">' + cycLine + (activeCur && !runEndMarked ? ' · 实际可能超过' + (eff.periodLen || 5) + '天：干净后请点下方「选择结束日」' : '') + '</div>' : '') +
+      (cycLine ? '<div class="pday-cycle">' + cycLine + (activeCur && !runEndMarked ? ' · 实际可能超过' + (cycle.periodLen || 5) + '天：干净后请点下方「选择结束日」' : '') + '</div>' : '') +
       (showProb ? '<div class="pday-prob' + (prob >= 50 ? ' hi' : prob >= 15 ? ' mid' : '') + '">若今日同房，怀孕概率约 ' + prob + '%<small>' + (prob >= 50 ? '（高危，如备孕请安排；反之注意防护）' : prob >= 15 ? '（较高）' : '（较低）') + ' · AI预测</small></div>' : '') +
       (actualText ? '<div class="pday-rec">' + actualText + (mk.p ? ' · 疼痛' + ['', '轻', '中', '重'][mk.p] : '') + (mk.mood ? ' · ' + mk.mood : '') + (mk.c ? ' · ' + mk.c + '色' : '') + (mk.s.length ? ' · ' + mk.s.join('/') : '') + '</div>' : '') +
       '<div class="pday-sec"><span>经期</span><div class="seg pc-seg">' + flowSeg + '</div></div>' +
@@ -1621,10 +1724,10 @@
       '<div class="pday-sec"><span>颜色</span><div class="pday-scroll">' + colorHtml + '</div></div>' +
       '<div class="pday-ops">' +
       (isStartDay ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearstart="1">取消开始</button>' : '<button type="button" class="btn ghost sm pc-btn" data-setstart="1">设为本次开始</button>') +
-      (isEndDay ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearend="1">取消结束</button>' : '<button type="button" class="btn ghost sm pc-btn' + (((mk.f > 0 || inPredicted || activeCur) && !runEndMarked) ? ' ok' : '') + '" data-end="1">' + (runEndMarked ? '修改结束日' : '选择结束日') + '</button>') +
+      (isEndDay ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearend="1">取消结束</button>' : '<button type="button" class="btn ghost sm pc-btn' + (((mk.f > 0 || predKind === 'period' || activeCur) && !runEndMarked) ? ' ok' : '') + '" data-end="1">' + (runEndMarked ? '修改结束日' : '选择结束日') + '</button>') +
       (hasRecord ? '<button type="button" class="btn ghost sm pc-btn del-ghost" data-clearrec="1">清除当日记录</button>' : '') +
       '</div>' +
-      (runEndMarked ? '<div class="pday-hint">本周期已记录：开始 ' + C().fmtCN(C().parseYMD(run.start)) + ' → 结束 ' + C().fmtCN(C().parseYMD(runEnd)) + '（若选错了，点其它日期即可修改）。</div>' : (activeCur ? '<div class="pday-hint">本次经期已开始、尚未选择结束日。预测约 ' + (eff.periodLen || 5) + ' 天，实际可能第 ' + ((eff.periodLen || 5) + 1) + '、' + ((eff.periodLen || 5) + 2) + ' 天才干净——请在真正结束的那天点「选择结束日」。</div>' : '')) +
+      (runEndMarked ? '<div class="pday-hint">本周期已记录：开始 ' + C().fmtCN(C().parseYMD(run.start)) + ' → 结束 ' + C().fmtCN(C().parseYMD(runEnd)) + '（若选错了，点其它日期即可修改）。</div>' : (activeCur ? '<div class="pday-hint">本次经期已开始、尚未选择结束日。预测约 ' + (cycle.periodLen || 5) + ' 天，实际可能第 ' + ((cycle.periodLen || 5) + 1) + '、' + ((cycle.periodLen || 5) + 2) + ' 天才干净——请在真正结束的那天点「选择结束日」。</div>' : '')) +
       '</div>';
   }
 
@@ -1647,68 +1750,66 @@
     else if (d.symptom) { const i = mark.s.indexOf(d.symptom); if (i >= 0) mark.s.splice(i, 1); else mark.s.push(d.symptom); S().putMark(ds, mark); }
     else if (d.color) { if (mark.c === d.color) mark.c = ''; else mark.c = d.color; S().putMark(ds, mark); }
     else if (d.end) {
-      // 选择结束日：可反复选择/改错，选中的日期直接覆盖该周期的结束记录
+      // 选择结束日：把当前活动周期存入记录，lastStart 置空
       const cycNow = S().getCycle();
       const cycRecs = S().getCycles();
       const run = actualRunFor(S().getMarks(), sel);
-      // 起点优先级：当天所在经期段起点 > “用户设置的开始日/已有记录”中最近且 <= 当天者
       let startStr = null;
       if (run && C().dayDiff(sel, C().parseYMD(run.start)) >= 0) {
         startStr = run.start;
+      } else if (cycNow.lastStart) {
+        startStr = cycNow.lastStart;
       } else {
         let best = null;
-        const consider = (s) => {
-          const sd = C().parseYMD(s);
-          if (!sd) return;
-          if (C().dayDiff(sel, sd) >= 0 && (!best || C().dayDiff(sd, best) > 0)) best = sd;
-        };
-        consider(cycNow.lastStart);
-        for (const k of Object.keys(cycRecs)) consider(k);
-        startStr = best ? C().ymd(best) : null;
+        for (const k of Object.keys(cycRecs)) {
+          const sd = C().parseYMD(k);
+          if (sd && C().dayDiff(sel, sd) >= 0 && (!best || C().dayDiff(sd, best) > 0)) best = k;
+        }
+        startStr = best;
       }
       if (!startStr) { toast('请先点「设为本次开始」，再选择结束日', 'err'); }
       else if (C().dayDiff(sel, C().parseYMD(startStr)) < 0) { toast('结束日不能早于开始日', 'err'); }
       else {
         const existed = !!cycRecs[startStr];
         S().putCycleRecord(startStr, C().ymd(sel));
-        S().setCycle({ lastStart: startStr });
-        toast(existed ? '已更新本周期结束日（选错可重选）' : '已记录本周期结束（单周期记录）');
+        S().setCycle({ lastStart: null });
+        clearAiCache();
+        toast(existed ? '已更新本周期结束日' : '已记录本周期结束');
       }
     }
     else if (d.setstart) {
-      // 设置新开始日：保存旧开始日到 prevStart，确保取消时可恢复
+      // 设置新开始日：如果有未结束的活动周期，自动按推算经期长度结束
       const oldCycle = S().getCycle();
-      const keepCycles = S().getCycles();
-      // 旧开始日如果不在 cycles 记录里，补一条（结束日记为旧开始日+经期长度-1）
-      if (oldCycle.lastStart && oldCycle.lastStart !== ds && !keepCycles[oldCycle.lastStart]) {
-        const periodEnd = C().ymd(C().addDays(C().parseYMD(oldCycle.lastStart), (oldCycle.periodLen || 5) - 1));
-        S().putCycleRecord(oldCycle.lastStart, periodEnd);
+      if (oldCycle.lastStart && oldCycle.lastStart !== ds && !S().getCycles()[oldCycle.lastStart]) {
+        const autoEnd = C().ymd(C().addDays(C().parseYMD(oldCycle.lastStart), (oldCycle.periodLen || 5) - 1));
+        S().putCycleRecord(oldCycle.lastStart, autoEnd);
       }
-      S().setCycle({ lastStart: ds, prevStart: oldCycle.lastStart || null });
-      // 确保历史周期记录不丢失
-      for (const k of Object.keys(keepCycles)) {
-        if (!S().getCycles()[k]) S().putCycleRecord(k, keepCycles[k]);
-      }
+      S().setCycle({ lastStart: ds });
+      clearAiCache();
       toast('已设为本次开始，周期已重新推算');
     }
     else if (d.clearstart) {
-      // 取消当前开始：优先恢复 prevStart，其次从 cycles 记录里找最近的开始日
+      // 取消开始：删除当前活动周期的记录，lastStart 置空
       const cur = S().getCycle();
-      let prevStart = cur.prevStart || null;
-      if (!prevStart) {
-        const cycRecs = S().getCycles();
-        for (const k of Object.keys(cycRecs)) {
-          if (k !== ds && (!prevStart || k > prevStart)) prevStart = k;
-        }
-      }
-      S().setCycle({ lastStart: prevStart, prevStart: null });
-      S().delCycleRecord(ds);
-      toast(prevStart ? '已取消，恢复到上一周期推算' : '已取消本次开始');
+      if (cur.lastStart) S().delCycleRecord(cur.lastStart);
+      S().setCycle({ lastStart: null });
+      clearAiCache();
+      toast('已取消本次开始');
     }
     else if (d.clearend) {
+      // 取消结束：从记录删除，如果是最近的周期则恢复为活动周期
       const cycRecs = S().getCycles();
       for (const k of Object.keys(cycRecs)) {
-        if (cycRecs[k] === ds) { S().delCycleRecord(k); toast('已取消结束日'); break; }
+        if (cycRecs[k] === ds) {
+          S().delCycleRecord(k);
+          const remaining = S().getCycles();
+          let latest = null;
+          for (const rk of Object.keys(remaining)) { if (!latest || rk > latest) latest = rk; }
+          if (!latest || k > latest) S().setCycle({ lastStart: k });
+          clearAiCache();
+          toast('已取消结束日');
+          break;
+        }
       }
     }
     else if (d.clearrec) { S().delMark(ds); }
@@ -1745,10 +1846,12 @@
       const per = parseInt(sheetEl.querySelector('#cyPer').value, 10);
       if (!st || !len || !per) { toast('请完整填写', 'err'); return; }
       S().setCycle({ lastStart: st, lastEnd: null, cycleLen: len, periodLen: per });
+      clearAiCache();
       disarm(); closeSheet(); renderPeriodPage(); toast('周期设置已保存');
     };
     const doClear = () => {
       S().resetCycleData();
+      clearAiCache();
       ui.calYM = null; ui.pday = null;
       disarm(); closeSheet();
       try { sessionStorage.setItem('dm_cycle_cleared', '1'); } catch (e) { /* 忽略 */ }
@@ -1833,29 +1936,30 @@
     const today = C().todayMid();
     const cycle = S().getCycle();
     const marks = S().getMarks();
-    const eff = effectiveCycle(cycle, S().getCycles());
+    const cycles = S().getCycles();
     const ds = C().ymd(today);
-    if (!cycle.lastStart) return { phase: 'none', info: null, eff, cycle, marks };
+    const activeStart = getActiveStart(cycle, cycles);
+    if (!activeStart) return { phase: 'none', info: null, cycle, marks, cycles };
     const run = actualRunFor(marks, today);
-    if (run || (marks[ds] && marks[ds].f > 0)) return { phase: 'period', info: { actual: true, run }, eff, cycle, marks };
-    const kind = C().dayKindOf(eff, marks, today);
-    return { phase: kind === 'normal' ? 'safe' : kind, info: null, eff, cycle, marks };
+    if (run || (marks[ds] && marks[ds].f > 0)) return { phase: 'period', info: { actual: true, run }, cycle, marks, cycles };
+    const kind = dayStatus(today, cycle, cycles);
+    return { phase: kind === 'normal' ? 'safe' : kind, info: null, cycle, marks, cycles };
   }
 
   function homeCycleBlock(ph) {
     const today = C().todayMid();
-    const { phase, info, eff, cycle, marks } = ph;
+    const { phase, info, cycle, marks, cycles } = ph;
     const meta = { icon: '🌱', title: '生理期 · 待设置', big: '设置开始日', sub: '点卡片去月历开启预测', tag: '' };
     if (phase === 'period') {
       meta.icon = '🌸';
-      const pi = C().periodDayInfo(eff, today);
       if (info && info.run) {
         meta.title = '生理期 · 经期进行中';
         meta.big = '第 ' + (C().dayDiff(today, C().parseYMD(info.run.start)) + 1) + ' 天';
         meta.sub = '注意保暖休息，结束那天记得标记结束';
       } else {
+        const sum = periodSummary(cycle, cycles, today);
         meta.title = '生理期 · 预测经期';
-        meta.big = pi ? '第 ' + (pi.day + 1) + ' 天' : '经期日';
+        meta.big = sum ? '第 ' + sum.day + ' 天' : '经期日';
         meta.sub = '预测阶段，实际以你记录为准';
       }
       meta.tag = '';
@@ -1869,14 +1973,25 @@
       meta.icon = '🍃'; meta.title = '生理期 · 安全期'; meta.big = '状态平稳';
       meta.sub = '今天照顾好自己，为下个周期蓄力'; meta.tag = '';
     }
-    const pi2 = phase !== 'none' ? C().periodDayInfo(eff, today) : null;
-    const progress = phase !== 'none' && pi2 ? '<div class="hc-bar"><i style="width:' + Math.min(100, Math.round(((pi2.day + 1) / (eff.cycleLen || 28)) * 100)) + '%"></i></div>' : '';
+    const sum = phase !== 'none' ? periodSummary(cycle, cycles, today) : null;
+    const progress = sum ? '<div class="hc-bar"><i style="width:' + Math.min(100, Math.round((sum.day / (cycle.cycleLen || 28)) * 100)) + '%"></i></div>' : '';
+    // 怀孕概率：已预测则显示今天的概率
+    const aiProbs = getAiProbs(cycle);
+    const todayStr = C().ymd(today);
+    let probLine = '';
+    if (aiProbs && aiProbs[todayStr] != null) {
+      const p = aiProbs[todayStr];
+      probLine = '<div class="hc-prob">今日怀孕概率 <b>' + p + '%</b>' + (p >= 50 ? ' 高危' : p >= 15 ? ' 较高' : ' 较低') + '</div>';
+    } else if (phase !== 'none') {
+      probLine = '<div class="hc-prob hc-prob-empty">怀孕概率未预测 · 去月历点击「怀孕概率」</div>';
+    }
     return '<div class="hm hc ph-' + phase + '" id="homeCycle">' +
       '<div class="hc-icon">' + meta.icon + '</div>' +
       '<div class="hc-body">' +
       '<div class="hc-t">' + esc(meta.title) + (meta.tag ? '<span class="hc-tag">' + esc(meta.tag) + '</span>' : '') + '</div>' +
       '<div class="hc-big">' + esc(meta.big) + '</div>' +
       '<div class="hc-sub">' + esc(meta.sub) + '</div>' +
+      probLine +
       progress +
       '</div>' +
       '<span class="chev">›</span>' +
@@ -1923,7 +2038,7 @@
       homeCycleBlock(ph) +
       homeAnnivBlock();
 
-    fetchHomeTip(ph.phase, ph.eff, ph.cycle);
+    fetchHomeTip(ph.phase, ph.cycle);
 
     const goCal = () => { ui.calYM = null; ui.pday = null; setTab('cal'); };
     const cyc = el.querySelector('#homeCycle'); if (cyc) cyc.onclick = goCal;
@@ -2032,8 +2147,6 @@
       const b = e.target.closest('.chip'); if (!b) return;
       const f = b.dataset.f;
       if (f === 'all') ui.filter = 'all';
-      else if (f === 'past') ui.filter = ui.filter === 'past' ? 'all' : 'past';
-      else if (f === 'yearly') ui.filter = ui.filter === 'yearly' ? 'all' : 'yearly';
       else ui.filter = ui.filter === f.slice(2) ? 'all' : f.slice(2);
       renderChips();
       if (ui.tab === 'list') renderList();
