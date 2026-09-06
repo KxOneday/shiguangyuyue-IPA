@@ -358,6 +358,33 @@
     });
   }
 
+  /* ---------- iOS 左边缘右滑返回 ---------- */
+  function wireSwipeBack() {
+    let startX = 0, startY = 0, tracking = false;
+    const EDGE = 25;
+    const THRESHOLD = 70;
+    document.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      if (t.clientX < EDGE) { tracking = true; startX = t.clientX; startY = t.clientY; }
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!tracking) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
+      if (dx > 10 && dx > dy) e.preventDefault();
+    }, { passive: false });
+    document.addEventListener('touchend', (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
+      if (dx > THRESHOLD && dy < dx) {
+        if (pgEl) closeSheet();
+        else if (window.history.length > 1) window.history.back();
+      }
+    });
+  }
+
   /* =========================================================
    * 事件操作
    * ========================================================= */
@@ -1008,12 +1035,24 @@
       if (b.dataset.act === 'exp') {
         S().exportData().then((json) => {
           const blob = new Blob([json], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'daoshuri-backup-' + new Date().toISOString().slice(0, 10) + '.json';
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-          toast('备份已导出');
+          const filename = 'daoshuri-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+          const file = new File([blob], filename, { type: 'application/json' });
+          const fallback = () => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+            toast('备份已导出');
+          };
+          // 优先调起系统分享面板，让用户选择保存位置（iOS 可选"存储到文件"）
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: '时光屿月备份', text: filename })
+              .then(() => toast('备份已导出'))
+              .catch(fallback);
+          } else {
+            fallback();
+          }
         });
       } else if (b.dataset.act === 'imp') {
         const fi = $('importFile');
@@ -1040,7 +1079,7 @@
       '<div class="sh"><div class="t">关于</div><button class="x" data-close="1">' + icon('close') + '</button></div>' +
       '<div class="about-logo"><span class="brand-logo about-app"><img class="brand-img" src="icons/app.png" alt="应用图标" /></span></div>' +
       '<div class="stack" style="align-items:center;gap:4px;padding-bottom:22px"><b style="font-size:20px">时光屿月</b><span style="color:var(--text2);font-size:13px">v1.0.0</span>' +
-      '<a class="about-author" href="https://qm.qq.com/q/f7pTz8BdSw" target="_blank" rel="noopener">作者：Felix.</a></div>'
+      '<a class="about-author" href="https://ti.qq.com/open_qq/index2.html?url=mqqapi%3A%2F%2Fuserprofile%2Ffriend_profile_card%3Fsrc_type%3Dweb%26version%3D1.0%26source%3D2%26uin%3D848007464" target="_blank" rel="noopener">作者：Felix.</a></div>'
     );
   }
 
@@ -1922,6 +1961,7 @@
     applyTheme();
     wireTop();
     wireSwipes();
+    wireSwipeBack();
     renderAll();
     ui.lastDayStr = C().ymd(new Date());
     // 顶栏实时时钟（首页显示秒）
